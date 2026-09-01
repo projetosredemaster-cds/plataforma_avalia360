@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { Button, TextField, Typography } from '@mui/material'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { EsqueciSenhaModal } from '../../components/EsqueciSenhaModal/EsqueciSenhaModal'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function LoginPage() {
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -38,6 +40,8 @@ export function LoginPage() {
       setErrorMsg('E-mail ou senha inválidos.')
       return
     }
+
+    navigate('/colaboradores', { replace: true })
   }
 
   return (

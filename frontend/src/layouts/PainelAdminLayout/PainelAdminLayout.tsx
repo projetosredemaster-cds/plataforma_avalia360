@@ -1,10 +1,27 @@
-import { AppBar, Box, Button, Toolbar, Typography } from '@mui/material'
+import {
+  AppBar,
+  Box,
+  Button,
+  Drawer,
+  List,
+  ListItemButton,
+  ListItemText,
+  Toolbar,
+  Typography,
+} from '@mui/material'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
+const SIDEBAR_WIDTH = 220
+
+const LINKS = [
+  { to: '/colaboradores', label: 'Colaboradores' },
+  { to: '/equipes', label: 'Equipes' },
+]
+
 /**
- * Shell simples (AppBar + links) para as telas de cadastro de colaboradores
- * e equipes. Só existe dentro da árvore já protegida por
+ * Shell (AppBar + sidebar) para as telas de cadastro de colaboradores e
+ * equipes. Só existe dentro da árvore já protegida por
  * `RotaProtegida papeis={['admin','gestor_rh']}` — por construção um
  * `colaborador` nunca chega a montar este layout. Quando o projeto ganhar um
  * shell de navegação global compartilhado com telas de `colaborador`, esse
@@ -22,27 +39,10 @@ export function PainelAdminLayout() {
 
   return (
     <div className="min-h-svh bg-gray-50">
-      <AppBar position="static" color="primary" elevation={0}>
+      <AppBar position="fixed" color="primary" elevation={0} sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar className="gap-4">
           <img src="/logo.jpg" alt="Avalia360" className="mr-4 h-8 w-auto" />
-          <Box className="flex flex-1 gap-2">
-            <Button
-              component={NavLink}
-              to="/colaboradores"
-              color="inherit"
-              sx={{ '&.active': { fontWeight: 700, textDecoration: 'underline' } }}
-            >
-              Colaboradores
-            </Button>
-            <Button
-              component={NavLink}
-              to="/equipes"
-              color="inherit"
-              sx={{ '&.active': { fontWeight: 700, textDecoration: 'underline' } }}
-            >
-              Equipes
-            </Button>
-          </Box>
+          <Box className="flex-1" />
           {colaborador && (
             <Typography variant="body2" sx={{ mr: 2 }}>
               {colaborador.nomeCompleto}
@@ -53,9 +53,39 @@ export function PainelAdminLayout() {
           </Button>
         </Toolbar>
       </AppBar>
-      <main className="p-6">
+
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: SIDEBAR_WIDTH,
+          flexShrink: 0,
+          '& .MuiDrawer-paper': { width: SIDEBAR_WIDTH, boxSizing: 'border-box' },
+        }}
+      >
+        <Toolbar />
+        <List>
+          {LINKS.map((link) => (
+            <ListItemButton
+              key={link.to}
+              component={NavLink}
+              to={link.to}
+              sx={{
+                '&.active': {
+                  fontWeight: 700,
+                  backgroundColor: 'action.selected',
+                },
+              }}
+            >
+              <ListItemText primary={link.label} />
+            </ListItemButton>
+          ))}
+        </List>
+      </Drawer>
+
+      <Box component="main" className="p-6" sx={{ marginLeft: `${SIDEBAR_WIDTH}px` }}>
+        <Toolbar />
         <Outlet />
-      </main>
+      </Box>
     </div>
   )
 }

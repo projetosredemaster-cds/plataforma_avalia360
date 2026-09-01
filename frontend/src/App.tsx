@@ -13,6 +13,10 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/acesso-negado" element={<AcessoNegadoPage />} />
 
+      <Route path="/" element={<RotaProtegida papeis={['admin', 'gestor_rh']} />}>
+        <Route index element={<Navigate to="/colaboradores" replace />} />
+      </Route>
+
       <Route element={<RotaProtegida papeis={['admin', 'gestor_rh']} />}>
         <Route element={<PainelAdminLayout />}>
           <Route path="/colaboradores" element={<ColaboradoresListPage />} />

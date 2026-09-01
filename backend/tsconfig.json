@@ -1,54 +1,26 @@
 {
-  // Visit https://aka.ms/tsconfig to read more about this file
-  "compilerOptions": {
-    // File Layout
-    "rootDir": "./src",
-    "outDir": "./dist",
-
-    // Environment Settings
-    // See also https://aka.ms/tsconfig/module
-    "module": "nodenext",
-    "target": "esnext",
-    "types": ["node"],
-    // For nodejs:
-    // "lib": ["esnext"],
-
-    // Other Outputs
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
-
-    // Stricter Typechecking Options
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-
-    // Style Options
-    // "noImplicitReturns": true,
-    // "noImplicitOverride": true,
-    // "noUnusedLocals": true,
-    // "noUnusedParameters": true,
-    // "noFallthroughCasesInSwitch": true,
-    // "noPropertyAccessFromIndexSignature": true,
-
-    // Recommended Options
-    "strict": true,
-    "jsx": "react-jsx",
-    // Desligado (era true): com "module": "nodenext" + package.json
-    // "type": "commonjs", verbatimModuleSyntax=true proíbe a sintaxe padrão
-    // `import`/`export` em arquivos resolvidos como CommonJS (TS1295) — ela
-    // preserva a sintaxe ESM tal qual em vez de convertê-la para
-    // require/module.exports, o que não compila em CJS puro. Desligar
-    // permite a sintaxe import/export idiomática de todo o módulo, com o
-    // tsc convertendo para CommonJS por trás, sem mudar module/target
-    // conforme o plano pediu.
-    "verbatimModuleSyntax": false,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
-    "skipLibCheck": true,
-
-    // TypeORM decorators
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-  }
+  "compilerOptions": 
+    {
+      "rootDir": "./src",
+      "outDir": "./dist",
+      "module": "nodenext",
+      "target": "esnext",
+      "types": ["node"],
+      "sourceMap": true,
+      "declaration": true,
+      "declarationMap": true,
+      "noUncheckedIndexedAccess": true,
+      "exactOptionalPropertyTypes": true,
+      "strict": true,
+      "jsx": "react-jsx",
+      "verbatimModuleSyntax": false,
+      "isolatedModules": true,
+      "noUncheckedSideEffectImports": true,
+      "moduleDetection": "force",
+      "skipLibCheck": true, 
+      "experimentalDecorators": true,
+      "emitDecoratorMetadata": true
+    },
+    "include": ["src/**/*"],
+    "exclude": ["node_modules", "dist", "**/*.config.ts"]
 }

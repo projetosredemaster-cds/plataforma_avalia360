@@ -1,96 +1,126 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Este arquivo fornece orientação ao Claude Code (claude.ai/code) ao trabalhar com código
+neste repositório.
 
-## Project
+## Projeto
 
-Plataforma de Avaliação 360° — a single-tenant 360° performance review platform.
-Two independent npm projects, no workspace/monorepo tooling tying them together:
+Plataforma de Avaliação 360° — uma plataforma single-tenant de avaliação de desempenho
+360°. Dois projetos npm independentes, sem tooling de workspace/monorepo ligando-os:
 
-- `frontend/` — React 19 + Vite + TypeScript. Currently the only side with real code.
-- `backend/` — Node.js + Express + TypeORM + Postgres (Supabase), intended to hold
-  entities/migrations/routes. As of now it has no `src/` yet — only `package.json`
-  and `tsconfig.json` exist; treat any backend work as greenfield.
+- `frontend/` — React 19 + Vite + TypeScript.
+- `backend/` — Node.js + Express + TypeORM + Postgres (Supabase). Já tem `src/` real
+  (não é mais greenfield): módulos `auth`, `colaboradores` e `equipes` implementados,
+  com migration, testes (Vitest) e scripts de build/dev configurados. Módulos futuros
+  (ciclos, pesquisas, respostas, relacionamentos de avaliação) ainda não existem —
+  trate-os como greenfield até serem implementados.
 
-The repo's own agents/skills (`.claude/agents/*.md`, `.claude/skills/*.md`) refer to
-these as `apps/web` and `apps/api` — that naming doesn't exist on disk, the real
-directories are `frontend/` and `backend/`. Read the agent/skill files with that
-substitution in mind.
+Os agentes/skills do próprio repositório (`.claude/agents/*.md`, `.claude/skills/**/*.md`)
+se referem a estes diretórios como `apps/web` e `apps/api` — essa nomenclatura não existe
+em disco, os diretórios reais são `frontend/` e `backend/`. Leia os arquivos de
+agente/skill com essa substituição em mente.
 
-There is no `schema_avaliacao360_pt.sql` file in the repo yet, even though agents/skills
-treat it as the source of truth for table/column names. If it's genuinely missing when
-you need it, ask the user rather than inventing table/column names.
+Não existe um arquivo `schema_avaliacao360_pt.sql` (ou variantes como `_v2`) no repo,
+mesmo que agentes/skills o tratem como fonte de verdade para nomes de tabela/coluna. Se
+ele estiver genuinamente ausente quando você precisar dele, pergunte ao usuário em vez
+de inventar nomes de tabela/coluna — mas para os módulos já implementados
+(`equipes`, `colaboradores`), a migration existente em `backend/src/migrations/` já é a
+fonte de verdade de fato para esses nomes.
 
-## Commands
+## Comandos
 
 Frontend (`frontend/`):
 ```
-npm run dev       # Vite dev server
+npm run dev       # servidor de desenvolvimento Vite
 npm run build      # tsc -b && vite build
 npm run lint       # eslint .
-npm run preview    # preview a production build
+npm run preview    # preview de um build de produção
 ```
 
-Backend (`backend/`): no build/lint/test scripts are wired up yet (`npm test` is the
-default CRA-style placeholder). Don't assume a script exists — check `package.json`
-before running one, and set up the real scripts as part of whatever backend work is
-requested.
+Backend (`backend/`):
+```
+npm run dev               # tsx watch src/server.ts
+npm run build              # tsc -p tsconfig.json
+npm run start               # node dist/server.js (após build)
+npm test                    # vitest run
+npm run test:watch          # vitest (watch mode)
+npm run typeorm              # typeorm-ts-node-commonjs -d src/data-source.ts
+npm run migration:generate  # gera uma migration a partir de mudanças na entidade
+npm run migration:run       # roda migrations pendentes contra DATABASE_URL
+npm run migration:revert    # reverte a última migration
+```
+Variáveis de ambiente obrigatórias em `backend/.env` (ver `backend/.env.example`):
+`DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (fail-fast no boot se
+alguma faltar — `backend/src/config/env.ts`). `PORT` (default `3333`) e `CORS_ORIGIN`
+(default `http://localhost:5173`) são opcionais. Nenhuma migration deve ser rodada
+contra um banco real sem confirmação explícita do usuário.
 
-## Multi-agent development workflow
+## Fluxo de desenvolvimento multiagente
 
-This repo drives feature work through a fixed pipeline of subagents defined in
-`.claude/agents/`, coordinated by `orquestrador`, with per-domain conventions captured
-as skills in `.claude/skills/`. When asked to implement a feature (as opposed to a
-one-off question), follow this pipeline rather than editing code directly:
+Este repositório conduz o desenvolvimento de funcionalidades através de um pipeline fixo
+de subagentes definidos em `.claude/agents/`, coordenado pelo `orquestrador`, com
+convenções por domínio capturadas como skills em `.claude/skills/`. Ao ser solicitado a
+implementar uma funcionalidade (em oposição a uma pergunta pontual), siga este pipeline
+em vez de editar código diretamente:
 
-1. **spec** (only if the request is ambiguous) → writes `.claude/tasks/<slug>/spec.md`.
-2. **planejamento-backend** / **planejamento-frontend** (whichever side is touched) →
-   writes `.claude/tasks/<slug>/task-backend.md` and/or `task-frontend.md` with
-   numbered steps.
-3. **backend-developer** / **frontend-developer** → implements step 1 of the relevant
-   task file. Backend may only touch `backend/**`; frontend may only touch `frontend/**`
-   (plus `.claude/tasks/**` to update status). Neither crosses into the other's tree.
-4. **backend-codereviewer** / **frontend-codereviewer** → review-only (never fixes
-   code directly), appends a "## Revisão" section to the task file with Crítico /
-   Deveria corrigir / Sugestão findings. Critical findings send the task back to the
-   developer step.
-5. **test-engineer** → runs last, once reviewers report no critical findings. Writes
-   automated tests, prioritizing the anonymization rule and role-based access control.
+1. **spec** (só se o pedido for ambíguo) → escreve `.claude/tasks/<slug>/spec.md`.
+2. **planejamento-backend** / **planejamento-frontend** (o lado tocado) → escreve
+   `.claude/tasks/<slug>/task-backend.md` e/ou `task-frontend.md` com passos numerados.
+3. **backend-developer** / **frontend-developer** → implementa o passo 1 do arquivo de
+   task correspondente. Backend só pode tocar `backend/**`; frontend só pode tocar
+   `frontend/**` (além de `.claude/tasks/**` para atualizar status). Nenhum dos dois
+   cruza para a árvore do outro.
+4. **backend-codereviewer** / **frontend-codereviewer** → apenas revisão (nunca corrige
+   código diretamente), adiciona uma seção "## Revisão" ao arquivo de task com achados
+   Crítico / Deveria corrigir / Sugestão. Achados críticos devolvem a task para a etapa
+   de desenvolvimento.
+5. **test-engineer** → roda por último, assim que os revisores reportarem nenhum achado
+   crítico. Escreve testes automatizados, priorizando a regra de anonimização e o
+   controle de acesso por papel.
 
-Task state lives under `.claude/tasks/<slug>/` — check there before starting new work
-on a feature to see if a spec/plan/review already exists (see `.claude/tasks/tela-login/`
-for a worked example of the full task-file format).
+Para ajustes pontuais e bem delimitados (ex.: corrigir um campo que não deveria existir
+em uma entidade), o usuário pode pedir diretamente ao `backend-developer` ou
+`frontend-developer`, pulando planejamento e code review — nesse caso, siga o pedido tal
+como formulado em vez de forçar o pipeline completo.
 
-## Core business rules (apply across both sides)
+O estado das tasks vive em `.claude/tasks/<slug>/` — confira lá antes de iniciar um novo
+trabalho em uma funcionalidade para ver se já existe spec/plano/revisão (veja
+`.claude/tasks/tela-login/` e `.claude/tasks/cadastro-colaboradores-equipes/` como
+exemplos completos do formato de arquivo de task).
 
-**Anonymization (the most sensitive rule in the project, detailed in the
-`backend-anonimizacao-respostas` skill):** answers of relationship type `pares` and
-`subordinado` must never be exposed identified (no `avaliador_id`) to the person being
-evaluated — only aggregated (averages/counts), and only once the respondent count for
-that evaluated person + cycle + type reaches `ciclos_avaliacao.minimo_respostas_pares`
-(default 3). Answers of type `autoavaliacao`, `gestor`, and `externo` may be identified.
-RH/admin always get the full identified view. Never write a query/endpoint reachable by
-`colaborador` that joins `itens_resposta` with `relacionamentos_avaliacao.avaliador_id`
-for `pares`/`subordinado` rows — use (or replicate the separation of) the
-`respostas_identificadas` and `respostas_pares_agregadas` views. Below the minimum,
-return an explicit state (e.g. `{ liberado: false, motivo: "aguardando_minimo_respondentes" }`),
-never an empty/partial array.
+## Regras de negócio centrais (aplicam-se aos dois lados)
 
-**Roles:** `admin`, `gestor_rh`, `colaborador`. Every protected backend route must check
-the authenticated user's role (Supabase Auth JWT); every frontend screen/action must
-adapt to or hide based on role.
+**Anonimização (a regra mais sensível do projeto, detalhada na skill
+`backend-anonimizacao-respostas`):** respostas do tipo de relacionamento `pares` e
+`subordinado` nunca podem ser expostas identificadas (sem `avaliador_id`) para a pessoa
+avaliada — só agregadas (médias/contagens), e somente quando o número de respondentes
+para aquele avaliado + ciclo + tipo atingir `ciclos_avaliacao.minimo_respostas_pares`
+(padrão 3). Respostas do tipo `autoavaliacao`, `gestor` e `externo` podem ser
+identificadas. RH/admin sempre têm a visão identificada completa. Nunca escreva uma
+query/endpoint acessível por `colaborador` que junte `itens_resposta` com
+`relacionamentos_avaliacao.avaliador_id` para linhas `pares`/`subordinado` — use (ou
+replique a separação de) as views `respostas_identificadas` e
+`respostas_pares_agregadas`. Abaixo do mínimo, retorne um estado explícito (ex.:
+`{ liberado: false, motivo: "aguardando_minimo_respondentes" }`), nunca um array
+vazio/parcial.
 
-**Question types:** exactly 4 — `likert`, `texto_aberto`, `matriz`, `pessoa`. Other types
-(CSAT, NPS, KPI, CES, NVS, Imagem, Indicação) were deliberately removed from MVP scope;
-don't reintroduce one without explicit confirmation already recorded in a spec.
+**Papéis:** `admin`, `gestor_rh`, `colaborador`. Toda rota protegida do backend deve
+checar o papel do usuário autenticado (JWT do Supabase Auth); toda tela/ação do frontend
+deve se adaptar ou se esconder conforme o papel.
 
-**Single-tenant:** never introduce `organization_id` or any multi-tenant isolation.
+**Tipos de pergunta:** exatamente 4 — `likert`, `texto_aberto`, `matriz`, `pessoa`.
+Outros tipos (CSAT, NPS, KPI, CES, NVS, Imagem, Indicação) foram deliberadamente
+removidos do escopo do MVP; não reintroduza nenhum sem confirmação explícita já
+registrada em uma spec.
 
-**Survey creation is always manual** — no auto-generation/AI/template shortcuts.
+**Single-tenant:** nunca introduza `organization_id` ou qualquer isolamento
+multi-tenant.
 
-## Backend conventions (`backend/`, per `backend-modulo-crud` skill)
+**Criação de pesquisa é sempre manual** — sem atalhos de auto-geração/IA/template.
 
-Module layout once modules exist:
+## Convenções de backend (`backend/`, por padrão da skill `backend-modulo-crud`)
+
+Estrutura de módulo (padrão já em uso por `equipes` e `colaboradores`):
 ```
 src/modules/<nome>/
   <nome>.entity.ts
@@ -101,37 +131,62 @@ src/modules/<nome>/
     criar-<nome>.dto.ts
     atualizar-<nome>.dto.ts
 ```
-- `@Entity('<nome_tabela>')` and `@Column()` names must match the Portuguese table/column
-  names from the schema exactly (e.g. `colaboradores`, `ciclos_avaliacao`,
-  `relacionamentos_avaliacao`) — never translate back to English or invent names.
-- Postgres enums (`papel_colaborador`, `status_ciclo`, `tipo_pergunta`,
-  `tipo_relacionamento`, `status_envio`, `status_pesquisa`) map to TypeORM enums with the
-  same Portuguese values.
-- Never rely on `synchronize: true` for schema changes — every schema change needs a
-  migration with `up`/`down`.
-- Role-authorization checks live centralized in the service layer, not duplicated per
-  route.
+- `@Entity('<nome_tabela>')` e nomes de `@Column()` devem bater exatamente com os nomes
+  em português de tabela/coluna do schema (ex.: `colaboradores`, `equipes`, e, quando
+  implementados, `ciclos_avaliacao`, `relacionamentos_avaliacao`) — nunca traduzir de
+  volta para inglês nem inventar nomes. Na ausência do arquivo de schema (ver seção
+  "Projeto"), a migration existente é a referência para os módulos já implementados.
+- Enums do Postgres (`papel_colaborador` já existe; futuramente `status_ciclo`,
+  `tipo_pergunta`, `tipo_relacionamento`, `status_envio`, `status_pesquisa`) mapeiam para
+  union types TypeScript (`src/common/enums.ts`, ver `PapelColaborador`) com os mesmos
+  valores em português — não usar `enum` nominal do TS para evitar atrito com union
+  types usados em DTOs/tipos de request.
+- Nunca depender de `synchronize: true` para mudanças de schema — toda mudança de schema
+  precisa de uma migration com `up`/`down` (`src/migrations/`).
+- Checagens de autorização por papel ficam centralizadas na camada de serviço via
+  `garantirPapel` (`src/common/autorizacao.ts`), chamada como primeira linha de cada
+  função exportada de `*.service.ts` — nunca duplicadas inline em controllers/rotas.
+- Erros usam a classe `ErroHttp` (`src/common/erro-http.ts`) com `status` + `codigo` +
+  mensagem, tratados centralmente pelo middleware de erro `tratadorErros`
+  (`src/middlewares/tratadorErros.ts`, montado por último em `app.ts`). Violações de
+  `UNIQUE` do Postgres (`err.code === '23505'`) são mapeadas por `err.constraint` para
+  `409` com um código específico — nomes de constraint na migration precisam bater com
+  esse mapeamento.
+- Autenticação (`src/middlewares/autenticacao.ts`, função `autenticar`) valida o JWT do
+  Supabase via `supabaseAdmin.auth.getUser`, resolve o `colaborador` vinculado
+  (exigindo `ativo = true`) e preenche `req.colaboradorAutenticado`. É montada por
+  `router.use(autenticar)` dentro de cada `*.module.ts`, nunca globalmente em `app.ts` —
+  fluxos públicos (ex.: resposta a pesquisa por link + CPF, sem login) não devem
+  reutilizar esse middleware.
+- Controllers usam `asyncHandler` (`src/common/http-async.ts`) para encaminhar erros
+  assíncronos a `next()` sem `try/catch` repetido.
+- `SUPABASE_SERVICE_ROLE_KEY` só é lida via `process.env` dentro de
+  `src/lib/supabaseAdmin.ts`/`src/config/env.ts` — nunca hardcoded, nunca logada, nunca
+  usada no frontend.
 
-## Frontend conventions (`frontend/`)
+## Convenções de frontend (`frontend/`)
 
-- **Styling: Tailwind CSS + MUI, no plain CSS.** Tailwind for layout/spacing/utility
-  colors, MUI components (`TextField`, `Button`, `Dialog`, etc.) for actual UI controls.
-  Where MUI and Tailwind would compete on the same property, MUI wins — customize via
-  the MUI `theme` (`createTheme`, `sx` prop), not Tailwind classes overriding a MUI
-  component. The project migrated off plain CSS files early on (see the "Refatoração...
-  Tailwind + MUI" note in `.claude/tasks/tela-login/task-frontend.md`); don't add new
-  `.css` files or large inline `style={{}}` blocks.
-- Question components (construtor de pesquisas / question rendering), per
-  `frontend-componente-pergunta` skill: one editor + one response component per type,
-  under `components/perguntas/Pergunta<Tipo>/`. Response components receive `valor` +
-  `onChange` via props and never call the API directly — the parent page/form persists.
-  Response components must block submission when `obrigatoria` is unmet.
-- Static assets referenced by URL (`/logo.jpg`, `/imagem-tela-login.jpg`) belong in
-  `public/`, not imported from `src/assets`.
-- No sensitive business logic (aggregation, anonymization) in the frontend — it must
-  come pre-computed from the API. If a results screen's data source isn't clearly
-  identified-vs-aggregated in the task, that's a stop-and-ask, not an assumption.
-- Supabase client lives at `frontend/src/lib/supabaseClient.ts`, reads
-  `import.meta.env.VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` — never hardcode these.
-  `frontend/.env.example` is intentionally versioned (with empty placeholders); `.env`
-  itself stays gitignored.
+- **Estilo: Tailwind CSS + MUI, sem CSS puro.** Tailwind para layout/espaçamento/cores
+  utilitárias, componentes MUI (`TextField`, `Button`, `Dialog`, etc.) para os controles
+  de UI de fato. Quando MUI e Tailwind competirem na mesma propriedade, MUI vence —
+  customize via `theme` do MUI (`createTheme`, prop `sx`), não com classes Tailwind
+  sobrescrevendo um componente MUI. O projeto migrou de arquivos CSS puros logo no
+  início (ver a nota "Refatoração... Tailwind + MUI" em
+  `.claude/tasks/tela-login/task-frontend.md`); não adicione novos arquivos `.css` nem
+  blocos grandes de `style={{}}` inline.
+- Componentes de pergunta (construtor de pesquisas / renderização de perguntas), por
+  padrão da skill `frontend-componente-pergunta`: um editor + um componente de resposta
+  por tipo, em `components/perguntas/Pergunta<Tipo>/`. Componentes de resposta recebem
+  `valor` + `onChange` via props e nunca chamam a API diretamente — a página/formulário
+  pai persiste. Componentes de resposta devem bloquear o envio quando `obrigatoria` não
+  for atendida.
+- Assets estáticos referenciados por URL (`/logo.jpg`, `/imagem-tela-login.jpg`) ficam em
+  `public/`, não importados de `src/assets`.
+- Nenhuma regra de negócio sensível (agregação, anonimização) no frontend — precisa vir
+  pré-computada da API. Se a fonte de dados de uma tela de resultados não estiver
+  claramente identificada como identificada-vs-agregada na task, isso é motivo para
+  parar e perguntar, não para assumir.
+- O client do Supabase fica em `frontend/src/lib/supabaseClient.ts`, lê
+  `import.meta.env.VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` — nunca hardcodear
+  esses valores. `frontend/.env.example` é intencionalmente versionado (com
+  placeholders vazios); o `.env` real permanece no gitignore.

@@ -14,8 +14,7 @@ export class CriarEquipesEColaboradores1788268503083 implements MigrationInterfa
       CREATE TABLE equipes (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         nome varchar(255) NOT NULL,
-        criado_em timestamptz NOT NULL DEFAULT now(),
-        atualizado_em timestamptz NOT NULL DEFAULT now()
+        criado_em timestamptz NOT NULL DEFAULT now()
       )
     `)
 

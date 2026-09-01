@@ -8,7 +8,13 @@ import { tratadorErros } from './middlewares/tratadorErros'
 
 const app = express()
 
-app.use(cors({ origin: env.corsOrigin }))
+app.use(
+  cors({
+    origin: env.corsOrigin,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }),
+)
 app.use(express.json())
 
 app.use('/api/auth', authRouter)

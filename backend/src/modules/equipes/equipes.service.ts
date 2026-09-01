@@ -13,7 +13,6 @@ export interface EquipeResposta {
   id: string
   nome: string
   criadoEm: string
-  atualizadoEm: string
 }
 
 function mapearEquipe(equipe: Equipe): EquipeResposta {
@@ -21,7 +20,6 @@ function mapearEquipe(equipe: Equipe): EquipeResposta {
     id: equipe.id,
     nome: equipe.nome,
     criadoEm: equipe.criadoEm.toISOString(),
-    atualizadoEm: equipe.atualizadoEm.toISOString(),
   }
 }
 
