@@ -28,6 +28,13 @@ API, formulário, rotas.
 
 ## Contexto do projeto
 
+- **Estilização**: Tailwind CSS + Material UI (MUI). Nunca escreva CSS puro
+  (arquivos `.css` avulsos, `style={{}}` inline extenso) — use classes Tailwind
+  para layout/espaçamento/cores utilitárias, e componentes MUI para elementos
+  de UI (inputs, botões, modais, etc.). Quando MUI e Tailwind competirem pela
+  mesma propriedade num mesmo elemento (ex.: cor, espaçamento de um
+  componente MUI), **prioridade é do MUI** — customize via `theme` do MUI
+  (`createTheme`, `sx` prop) em vez de sobrepor com classes Tailwind.
 - Papéis: `admin`, `gestor_rh`, `colaborador` — a UI deve se adaptar conforme
   o papel do usuário logado.
 - Criação de pesquisa é sempre manual — não implemente atalhos de geração

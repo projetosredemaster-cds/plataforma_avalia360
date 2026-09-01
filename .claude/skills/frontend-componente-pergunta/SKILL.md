@@ -41,6 +41,13 @@ components/perguntas/
   de relacionamento podem ser selecionados). Resposta mostra um seletor de
   colaborador (respeitando o filtro), salva `{ colaborador_id: string }`.
 
+## Estilização
+
+Use Tailwind CSS para layout/espaçamento e componentes MUI (`TextField`,
+`RadioGroup`, `Slider`, `Autocomplete`, etc.) para os controles de resposta
+em si. Não escreva CSS puro. Em conflito, o `theme`/`sx` do MUI vence sobre
+classes Tailwind.
+
 ## Regras gerais
 
 - Todo componente de resposta deve tratar `obrigatoria` — não deixar submeter

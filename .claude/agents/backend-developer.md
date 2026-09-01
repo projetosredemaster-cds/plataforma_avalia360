@@ -38,8 +38,14 @@ demanda alterar schema) e rotas/controller/service.
   (`colaboradores`, `equipes`, `ciclos_avaliacao`, `pesquisas`,
   `paginas_pesquisa`, `perguntas`, `relacionamentos_avaliacao`,
   `envios_pesquisa`, `respostas`, `itens_resposta`, `competencias`).
-- Papéis: `admin`, `gestor_rh`, `colaborador` — toda rota protegida deve checar
-  o papel do usuário autenticado (JWT do Supabase Auth) antes de liberar acesso.
+- Papéis: `admin`, `gestor_rh`, `colaborador` — mas **só admin e gestor_rh têm
+  conta no Supabase Auth** (`colaboradores.usuario_auth_id`). Toda rota
+  protegida por login deve checar o papel via esse vínculo.
+- O `colaborador` comum NUNCA tem sessão Supabase Auth. Ele acessa pesquisas
+  só via link do envio (token) + confirmação de CPF. Qualquer rota desse
+  fluxo público deve usar a **service role key** do Supabase (bypassa RLS) e
+  validar token+CPF manualmente no código — nunca trate esse fluxo como
+  "usuário autenticado comum".
 - Tipos de pergunta: `likert`, `texto_aberto`, `matriz`, `pessoa` — não
   adicione outros sem a task explicitamente pedir.
 

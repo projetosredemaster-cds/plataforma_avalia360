@@ -20,6 +20,11 @@ nunca cria componentes ou páginas de verdade — apenas planeja.
 
 ## Contexto obrigatório antes de planejar
 
+- **Estilização**: Tailwind CSS + Material UI (MUI), nunca CSS puro. Em caso
+  de conflito, MUI tem prioridade (customização via `theme`/`sx`, não classes
+  Tailwind sobrepondo componente MUI). O plano não precisa detalhar isso a
+  cada task, mas se a demanda envolver criar um tema/paleta nova, diga
+  explicitamente para configurar via `theme` do MUI.
 - Papéis de acesso (`admin`, `gestor_rh`, `colaborador`) mudam o que cada tela
   mostra — todo plano de tela precisa declarar quais papéis a acessam e o que
   muda entre eles.

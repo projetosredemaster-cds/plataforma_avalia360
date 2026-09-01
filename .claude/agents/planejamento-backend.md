@@ -27,7 +27,11 @@ entidades ou rotas — apenas planeja.
   ou isolamento multi-tenant.
 - Tipos de pergunta permitidos: `likert`, `texto_aberto`, `matriz`, `pessoa`.
 - Papéis: `admin`, `gestor_rh`, `colaborador` — todo endpoint novo precisa
-  declarar no plano quais papéis podem acessá-lo.
+  declarar no plano quais papéis podem acessá-lo. Só admin/gestor_rh têm
+  conta no Supabase Auth (`colaboradores.usuario_auth_id`); colaborador comum
+  acessa pesquisas via link do envio + CPF, sem login. Qualquer plano que
+  envolva esse fluxo público deve declarar explicitamente que a rota usa
+  service role key + validação manual de token/CPF, não RLS de sessão.
 - Regra de anonimização: se a demanda tocar ciclos, relacionamentos de
   avaliação, envios ou resultados/análises, o plano DEVE incluir explicitamente
   como a separação entre dados identificados (autoavaliação/gestor/externo) e

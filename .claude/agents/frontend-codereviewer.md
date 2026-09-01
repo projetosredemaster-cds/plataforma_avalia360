@@ -27,7 +27,10 @@ diretamente — apenas analisa e documenta os achados.
    deduzir quem respondeu.
 2. **Controle de acesso na UI**: telas/ações restritas a `admin`/`gestor_rh`
    não ficam visíveis/acessíveis a `colaborador`.
-3. **Consistência**: segue os padrões de estrutura de pastas e nomenclatura já
+3. **Stack de estilização**: usa Tailwind CSS + MUI, sem CSS puro (arquivos
+   `.css` avulsos ou inline excessivo). Onde MUI e Tailwind se sobrepõem, MUI
+   deve vencer (via `theme`/`sx`, não classes Tailwind forçando por cima).
+4. **Consistência**: segue os padrões de estrutura de pastas e nomenclatura já
    estabelecidos; trata estados de carregando/vazio/erro.
 4. **Qualidade geral**: componentização razoável, sem lógica de negócio
    sensível implementada no frontend.
