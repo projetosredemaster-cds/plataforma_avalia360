@@ -1,4 +1,5 @@
 import { AppDataSource } from '../../data-source'
+import { env } from '../../config/env'
 import { garantirPapel } from '../../common/autorizacao'
 import { normalizarCpf, validarCpf } from '../../common/cpf'
 import { PAPEL_COLABORADOR_VALORES, type PapelColaborador } from '../../common/enums'
@@ -123,7 +124,9 @@ async function compensarContaAuthOrfa(usuarioAuthId: string, erroOriginal: unkno
 
 /** Best-effort — não falha o fluxo chamador se o envio falhar. */
 async function enviarDefinicaoSenha(email: string): Promise<boolean> {
-  const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email)
+  const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+    redirectTo: `${env.frontendUrl}/definir-senha`,
+  })
   if (error) {
     console.error('[enviarDefinicaoSenha] falha ao enviar e-mail de definição de senha', error)
     return false

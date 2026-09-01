@@ -52,7 +52,9 @@ export function EsqueciSenhaModal({ open, onClose }: EsqueciSenhaModalProps) {
     }
 
     setStatus('loading')
-    const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail)
+    const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+      redirectTo: `${window.location.origin}/definir-senha`,
+    })
 
     if (error) {
       setStatus('error')

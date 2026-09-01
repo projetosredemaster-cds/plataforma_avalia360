@@ -17,17 +17,9 @@ const SIDEBAR_WIDTH = 220
 const LINKS = [
   { to: '/colaboradores', label: 'Colaboradores' },
   { to: '/equipes', label: 'Equipes' },
+  { to: '/pesquisas', label: 'Pesquisas' },
 ]
 
-/**
- * Shell (AppBar + sidebar) para as telas de cadastro de colaboradores e
- * equipes. Só existe dentro da árvore já protegida por
- * `RotaProtegida papeis={['admin','gestor_rh']}` — por construção um
- * `colaborador` nunca chega a montar este layout. Quando o projeto ganhar um
- * shell de navegação global compartilhado com telas de `colaborador`, esse
- * shell deverá reusar `useAuth().colaborador.papel` para decidir se mostra
- * os links "Colaboradores"/"Equipes" — fora de escopo desta task.
- */
 export function PainelAdminLayout() {
   const { colaborador, sair } = useAuth()
   const navigate = useNavigate()
@@ -41,7 +33,7 @@ export function PainelAdminLayout() {
     <div className="min-h-svh bg-gray-50">
       <AppBar position="fixed" color="primary" elevation={0} sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar className="gap-4">
-          <img src="/logo.jpg" alt="Avalia360" className="mr-4 h-8 w-auto" />
+          <img src="/logo.png" alt="Avalia360" className="mr-4 h-8 w-auto" />
           <Box className="flex-1" />
           {colaborador && (
             <Typography variant="body2" sx={{ mr: 2 }}>

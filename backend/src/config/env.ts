@@ -6,6 +6,7 @@ interface Env {
   supabaseUrl: string
   supabaseServiceRoleKey: string
   corsOrigin: string
+  frontendUrl: string
 }
 
 function exigirVariavel(nome: string): string {
@@ -40,4 +41,8 @@ export const env: Env = {
   // seguro para dev local do frontend Vite caso não esteja definida (ou
   // definida como string vazia). Em produção, basta setar CORS_ORIGIN.
   corsOrigin: variavelComPadrao('CORS_ORIGIN', 'http://localhost:5173'),
+  // Usada para montar links absolutos que apontam pro frontend (ex.:
+  // redirectTo de e-mails do Supabase Auth) — mesmo tratamento de "opcional
+  // com padrão seguro para dev local" do corsOrigin acima.
+  frontendUrl: variavelComPadrao('FRONTEND_URL', 'http://localhost:5173'),
 }

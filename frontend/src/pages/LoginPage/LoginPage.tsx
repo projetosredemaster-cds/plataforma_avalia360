@@ -1,13 +1,19 @@
 import { useState, type FormEvent } from 'react'
 import { Button, TextField, Typography } from '@mui/material'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { EsqueciSenhaModal } from '../../components/EsqueciSenhaModal/EsqueciSenhaModal'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+interface LoginLocationState {
+  mensagem?: string
+}
+
 export function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const successMsg = (location.state as LoginLocationState | null)?.mensagem ?? null
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -59,6 +65,11 @@ export function LoginPage() {
           <img src="/logo.jpg" alt="Avalia360" className="mb-8 w-[320px]" />
 
           <form onSubmit={handleSubmit} noValidate className="flex w-full flex-col gap-4">
+            {successMsg && (
+              <Typography role="status" color="success.main" variant="body2" sx={{ textAlign: 'left' }}>
+                {successMsg}
+              </Typography>
+            )}
             <TextField
               id="login-email"
               label="E-mail"

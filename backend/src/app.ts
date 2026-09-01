@@ -3,7 +3,9 @@ import express from 'express'
 import { env } from './config/env'
 import { authRouter } from './modules/auth/auth.module'
 import { colaboradoresRouter } from './modules/colaboradores/colaboradores.module'
+import { competenciasRouter } from './modules/competencias/competencias.module'
 import { equipesRouter } from './modules/equipes/equipes.module'
+import { pesquisasRouter } from './modules/pesquisas/pesquisas.module'
 import { tratadorErros } from './middlewares/tratadorErros'
 
 const app = express()
@@ -20,6 +22,8 @@ app.use(express.json())
 app.use('/api/auth', authRouter)
 app.use('/api/equipes', equipesRouter)
 app.use('/api/colaboradores', colaboradoresRouter)
+app.use('/api/pesquisas', pesquisasRouter)
+app.use('/api/competencias', competenciasRouter)
 
 // Middleware de erro (4 args) precisa ser o último app.use.
 app.use(tratadorErros)
