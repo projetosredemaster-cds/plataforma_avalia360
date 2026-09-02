@@ -16,6 +16,10 @@ export const STATUS_PESQUISA_VALORES: StatusPesquisa[] = [
   'encerrada',
 ]
 
+export type StatusCiclo = 'rascunho' | 'ativo' | 'encerrado'
+
+export const STATUS_CICLO_VALORES: StatusCiclo[] = ['rascunho', 'ativo', 'encerrado']
+
 // Exatamente 4 tipos de pergunta no MVP — CSAT/NPS/KPI/CES/NVS/Imagem/
 // Indicação foram deliberadamente removidos do escopo, não reintroduzir.
 export type TipoPergunta = 'likert' | 'texto_aberto' | 'matriz' | 'pessoa'
@@ -28,11 +32,11 @@ export const TIPO_PERGUNTA_VALORES: TipoPergunta[] = [
 ]
 
 /**
- * Constante TS PROVISÓRIA (não é enum Postgres ainda — `relacionamentos_avaliacao`
- * não existe). Usada só para validar `configuracao.filtroRelacionamento` de
- * perguntas tipo `pessoa` (lista de tipos de relacionamento selecionáveis no
- * formulário, não dado de resposta). Quando o módulo de ciclos/relacionamentos
- * for criado, reconciliar com o enum Postgres real `tipo_relacionamento`.
+ * Reflete o enum Postgres `tipo_relacionamento`, criado pela migration do
+ * módulo `ciclos-avaliacao` (`relacionamentos_avaliacao.tipo_relacionamento`).
+ * Também usada para validar `configuracao.filtroRelacionamento` de perguntas
+ * tipo `pessoa` (lista de tipos de relacionamento selecionáveis no
+ * formulário, não dado de resposta).
  */
 export type TipoRelacionamento =
   | 'autoavaliacao'

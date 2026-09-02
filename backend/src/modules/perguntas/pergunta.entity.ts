@@ -35,12 +35,6 @@ export class Pergunta {
   @Column({ type: 'boolean', default: true })
   obrigatoria!: boolean
 
-  // Guarda EXCLUSIVAMENTE configuração estrutural da pergunta (niveis/
-  // rotulos para likert/matriz, filtroRelacionamento para pessoa, {} para
-  // texto_aberto — ver validarConfiguracaoPergunta em perguntas.service.ts).
-  // NUNCA resposta, respondenteId, avaliadorId, contagem de respostas ou
-  // qualquer dado de execução (guard rail de anonimização — ver
-  // task-backend.md seção 1.8 e skill backend-anonimizacao-respostas).
   @Column({ type: 'jsonb', default: {} })
   configuracao!: Record<string, unknown>
 

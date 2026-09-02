@@ -1,9 +1,9 @@
-// Criação é sempre manual — `status` não é aceito aqui (nasce sempre
-// `rascunho`, ver pesquisas.service.ts). Nenhum atalho de auto-geração/IA/
-// template de páginas ou perguntas.
+// Sem `cicloId`: uma pesquisa recém-criada sempre nasce `rascunho`
+// (hardcoded em pesquisas.service.criar), e vincular um ciclo exige
+// `status === 'publicada'` (ver pesquisas.service.ts, validarCicloExistente)
+// — logo `cicloId` nunca teria como ser aceito na criação.
 export interface CriarPesquisaDto {
   titulo: string
   mensagemBoasVindas?: string
   logoUrl?: string
-  cicloId?: string | null
 }

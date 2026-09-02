@@ -18,6 +18,7 @@ const LINKS = [
   { to: '/colaboradores', label: 'Colaboradores' },
   { to: '/equipes', label: 'Equipes' },
   { to: '/pesquisas', label: 'Pesquisas' },
+  { to: '/ciclos', label: 'Ciclos' },
 ]
 
 export function PainelAdminLayout() {

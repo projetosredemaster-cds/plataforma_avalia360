@@ -5,6 +5,8 @@ import { STATUS_PESQUISA_VALORES, type StatusPesquisa } from '../../common/enums
 import { ErroHttp } from '../../common/erro-http'
 import { validarEnum, validarTextoObrigatorio } from '../../common/validacao'
 import type { ColaboradorAutenticado } from '../../types/express'
+import { CicloAvaliacao } from '../ciclos-avaliacao/ciclo-avaliacao.entity'
+import { garantirCicloEditavel } from '../ciclos-avaliacao/ciclos-avaliacao.service'
 import { Competencia } from '../competencias/competencia.entity'
 import * as paginasPesquisaService from '../paginas-pesquisa/paginas-pesquisa.service'
 import { PaginaPesquisa } from '../paginas-pesquisa/pagina-pesquisa.entity'
@@ -17,9 +19,6 @@ import { Pesquisa } from './pesquisa.entity'
 
 const PAPEIS_COM_ACESSO = ['admin', 'gestor_rh'] as const
 
-// Mesmo regex já usado no restante do plano — valida só o formato (UUID
-// sintaticamente válido), nunca a existência em `ciclos_avaliacao` (a
-// tabela ainda não existe, ver decisão assumida 3 do plano da task).
 const REGEX_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Só avanço, nunca regressão, nunca pular etapa (decisão assumida 5).
@@ -76,11 +75,24 @@ function repositorio() {
   return AppDataSource.getRepository(Pesquisa)
 }
 
-function validarFormatoCicloId(valor: unknown): string {
+/**
+ * Valida formato (UUID sintaticamente válido) e EXISTÊNCIA em
+ * `ciclos_avaliacao` — tech debt resolvido pela task de ciclos de avaliação
+ * (antes só validava formato, ver histórico do módulo).
+ */
+async function validarCicloExistente(valor: unknown): Promise<CicloAvaliacao> {
   if (typeof valor !== 'string' || !REGEX_UUID.test(valor.trim())) {
     throw new ErroHttp(422, 'CAMPO_INVALIDO', 'Campo "cicloId" deve ser um UUID válido ou null.')
   }
-  return valor.trim()
+
+  const id = valor.trim()
+
+  const ciclo = await AppDataSource.getRepository(CicloAvaliacao).findOneBy({ id })
+  if (!ciclo) {
+    throw new ErroHttp(404, 'CICLO_NAO_ENCONTRADO', 'Ciclo de avaliação não encontrado.')
+  }
+
+  return ciclo
 }
 
 function mapearPesquisaLista(pesquisa: Pesquisa): PesquisaRespostaLista {
@@ -202,14 +214,11 @@ export async function criar(
       ? validarTextoObrigatorio(dto.logoUrl, { campo: 'logoUrl', min: 1, max: 500 })
       : null
 
-  const cicloId =
-    dto.cicloId !== undefined && dto.cicloId !== null ? validarFormatoCicloId(dto.cicloId) : null
-
   const nova = repositorio().create({
     titulo,
     mensagemBoasVindas,
     logoUrl,
-    cicloId,
+    cicloId: null,
     status: 'rascunho',
   })
 
@@ -269,7 +278,24 @@ export async function atualizar(
   }
 
   if ('cicloId' in dto) {
-    pesquisa.cicloId = dto.cicloId === null ? null : validarFormatoCicloId(dto.cicloId)
+    if (dto.cicloId === null) {
+      // Desvincular é sempre permitido, independentemente do status da
+      // pesquisa ou do ciclo (decisão assumida 10 do plano da task de ciclos).
+      pesquisa.cicloId = null
+    } else {
+      const ciclo = await validarCicloExistente(dto.cicloId)
+      garantirCicloEditavel(ciclo)
+
+      if (pesquisa.status !== 'publicada') {
+        throw new ErroHttp(
+          409,
+          'PESQUISA_NAO_PUBLICADA',
+          'Só é possível vincular um ciclo a uma pesquisa publicada.',
+        )
+      }
+
+      pesquisa.cicloId = ciclo.id
+    }
   }
 
   const salva = await repositorio().save(pesquisa)

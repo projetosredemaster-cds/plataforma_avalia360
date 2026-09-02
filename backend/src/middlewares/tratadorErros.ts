@@ -13,6 +13,7 @@ const MAPA_CONSTRAINT_PARA_CODIGO: Record<string, string> = {
   uq_competencias_nome: 'COMPETENCIA_NOME_DUPLICADO',
   uq_paginas_pesquisa_pesquisa_ordem: 'PAGINA_ORDEM_DUPLICADA',
   uq_perguntas_pagina_ordem: 'PERGUNTA_ORDEM_DUPLICADA',
+  uq_ciclo_participantes_ciclo_colaborador: 'CICLO_PARTICIPANTE_DUPLICADO',
 }
 
 /** Middleware de erro (4 args) — precisa ser o último app.use em app.ts. */

@@ -10,22 +10,27 @@ Plataforma de Avaliação 360° — uma plataforma single-tenant de avaliação 
 
 - `frontend/` — React 19 + Vite + TypeScript.
 - `backend/` — Node.js + Express + TypeORM + Postgres (Supabase). Já tem `src/` real
-  (não é mais greenfield): módulos `auth`, `colaboradores` e `equipes` implementados,
-  com migration, testes (Vitest) e scripts de build/dev configurados. Módulos futuros
-  (ciclos, pesquisas, respostas, relacionamentos de avaliação) ainda não existem —
-  trate-os como greenfield até serem implementados.
+  (não é mais greenfield): módulos `auth`, `colaboradores`, `equipes`, `competencias`,
+  `pesquisas`, `paginas-pesquisa` e `perguntas` implementados, com migrations, testes
+  (Vitest) e scripts de build/dev configurados. Módulos futuros (`ciclos_avaliacao`,
+  `relacionamentos_avaliacao`, `envios_pesquisa`, `respostas`, `itens_resposta`) ainda
+  não existem — trate-os como greenfield até serem implementados.
 
 Os agentes/skills do próprio repositório (`.claude/agents/*.md`, `.claude/skills/**/*.md`)
 se referem a estes diretórios como `apps/web` e `apps/api` — essa nomenclatura não existe
 em disco, os diretórios reais são `frontend/` e `backend/`. Leia os arquivos de
 agente/skill com essa substituição em mente.
 
-Não existe um arquivo `schema_avaliacao360_pt.sql` (ou variantes como `_v2`) no repo,
-mesmo que agentes/skills o tratem como fonte de verdade para nomes de tabela/coluna. Se
-ele estiver genuinamente ausente quando você precisar dele, pergunte ao usuário em vez
-de inventar nomes de tabela/coluna — mas para os módulos já implementados
-(`equipes`, `colaboradores`), a migration existente em `backend/src/migrations/` já é a
-fonte de verdade de fato para esses nomes.
+`docs/schema_avaliacao360_pt_v2.sql` existe no repo — é a fonte de verdade para nomes de
+tabela/coluna dos módulos ainda não implementados. Para os módulos já implementados, a
+migration existente em `backend/src/migrations/` é a fonte de verdade de fato (nenhuma
+das duas migrations foi rodada contra um banco real ainda — dá pra editar in-place em
+vez de gerar uma migration de correção em cima). Divergência conhecida e deliberada
+entre as duas: o módulo `perguntas` usa `enunciado` (sem `descricao`) e uma tabela
+relacional `perguntas_competencias` para o vínculo matriz↔competência, enquanto o doc de
+schema descreve `titulo`+`descricao` e vínculo via jsonb — já implementado ponta a ponta
+(service, DTOs, 15 arquivos do frontend); não alterar isso sem confirmação explícita do
+usuário.
 
 ## Comandos
 
@@ -51,9 +56,11 @@ npm run migration:revert    # reverte a última migration
 ```
 Variáveis de ambiente obrigatórias em `backend/.env` (ver `backend/.env.example`):
 `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (fail-fast no boot se
-alguma faltar — `backend/src/config/env.ts`). `PORT` (default `3333`) e `CORS_ORIGIN`
-(default `http://localhost:5173`) são opcionais. Nenhuma migration deve ser rodada
-contra um banco real sem confirmação explícita do usuário.
+alguma faltar — `backend/src/config/env.ts`). `PORT` (default `3333`), `CORS_ORIGIN`
+(default `http://localhost:5173`) e `FRONTEND_URL` (default `http://localhost:5173`,
+usada para montar links absolutos que apontam pro frontend, ex.: `redirectTo` de
+e-mails do Supabase Auth) são opcionais. Nenhuma migration deve ser rodada contra um
+banco real sem confirmação explícita do usuário.
 
 ## Fluxo de desenvolvimento multiagente
 
@@ -85,8 +92,8 @@ como formulado em vez de forçar o pipeline completo.
 
 O estado das tasks vive em `.claude/tasks/<slug>/` — confira lá antes de iniciar um novo
 trabalho em uma funcionalidade para ver se já existe spec/plano/revisão (veja
-`.claude/tasks/tela-login/` e `.claude/tasks/cadastro-colaboradores-equipes/` como
-exemplos completos do formato de arquivo de task).
+`.claude/tasks/tela-login/`, `.claude/tasks/cadastro-colaboradores-equipes/` e
+`.claude/tasks/pesquisas/` como exemplos completos do formato de arquivo de task).
 
 ## Regras de negócio centrais (aplicam-se aos dois lados)
 
@@ -132,15 +139,18 @@ src/modules/<nome>/
     atualizar-<nome>.dto.ts
 ```
 - `@Entity('<nome_tabela>')` e nomes de `@Column()` devem bater exatamente com os nomes
-  em português de tabela/coluna do schema (ex.: `colaboradores`, `equipes`, e, quando
-  implementados, `ciclos_avaliacao`, `relacionamentos_avaliacao`) — nunca traduzir de
-  volta para inglês nem inventar nomes. Na ausência do arquivo de schema (ver seção
-  "Projeto"), a migration existente é a referência para os módulos já implementados.
-- Enums do Postgres (`papel_colaborador` já existe; futuramente `status_ciclo`,
-  `tipo_pergunta`, `tipo_relacionamento`, `status_envio`, `status_pesquisa`) mapeiam para
-  union types TypeScript (`src/common/enums.ts`, ver `PapelColaborador`) com os mesmos
-  valores em português — não usar `enum` nominal do TS para evitar atrito com union
-  types usados em DTOs/tipos de request.
+  em português de tabela/coluna do schema (ex.: `colaboradores`, `equipes`,
+  `competencias`, `pesquisas`, `paginas_pesquisa`, `perguntas`,
+  `perguntas_competencias` e, quando implementados, `ciclos_avaliacao`,
+  `relacionamentos_avaliacao`) — nunca traduzir de volta para inglês nem inventar nomes.
+  Para módulos ainda não implementados, `docs/schema_avaliacao360_pt_v2.sql` é a
+  referência; para os já implementados, a migration existente é a referência de fato
+  (ver seção "Projeto" sobre a divergência conhecida no módulo `perguntas`).
+- Enums do Postgres (`papel_colaborador`, `tipo_pergunta` e `status_pesquisa` já
+  existem; futuramente `status_ciclo`, `tipo_relacionamento`, `status_envio`) mapeiam
+  para union types TypeScript (`src/common/enums.ts`, ver `PapelColaborador`) com os
+  mesmos valores em português — não usar `enum` nominal do TS para evitar atrito com
+  union types usados em DTOs/tipos de request.
 - Nunca depender de `synchronize: true` para mudanças de schema — toda mudança de schema
   precisa de uma migration com `up`/`down` (`src/migrations/`).
 - Checagens de autorização por papel ficam centralizadas na camada de serviço via

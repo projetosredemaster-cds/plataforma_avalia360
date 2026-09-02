@@ -1,5 +1,14 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm'
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm'
 import { STATUS_PESQUISA_VALORES, type StatusPesquisa } from '../../common/enums'
+import { CicloAvaliacao } from '../ciclos-avaliacao/ciclo-avaliacao.entity'
 
 @Entity('pesquisas')
 export class Pesquisa {
@@ -23,14 +32,15 @@ export class Pesquisa {
   })
   status!: StatusPesquisa
 
-  // Sem @ManyToOne/@JoinColumn: `ciclos_avaliacao` ainda não existe, então
-  // esta é só uma coluna solta (uuid nullable, sem FK) — dívida técnica
-  // assumida (decisão assumida 3 do plano da task). Validado só quanto ao
-  // formato (UUID sintaticamente válido) na camada de serviço, nunca quanto
-  // à existência. Adicionar `@ManyToOne`/`@JoinColumn` + FK na migration
-  // quando o módulo de ciclos existir.
   @Column({ name: 'ciclo_id', type: 'uuid', nullable: true })
   cicloId!: string | null
+
+  @ManyToOne(() => CicloAvaliacao, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'ciclo_id' })
+  ciclo!: CicloAvaliacao | null
+
+  @Column({ name: 'criado_por', type: 'uuid', nullable: true })
+  criadoPor!: string | null
 
   @CreateDateColumn({ name: 'criado_em' })
   criadoEm!: Date

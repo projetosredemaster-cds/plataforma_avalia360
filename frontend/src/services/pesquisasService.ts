@@ -9,15 +9,25 @@ export interface CriarPesquisaPayload {
 }
 
 /**
- * Corpo de `PUT /api/pesquisas/:id`. `mensagemBoasVindas`/`logoUrl` aceitam
- * `null` explícito para "limpar" o campo — distinto de omitido ("não
- * alterar"), mesmo padrão `'campo' in dto` já usado pelo backend para
- * `cicloId`. Nunca envie string vazia como substituto de `null`.
+ * Corpo de `PUT /api/pesquisas/:id`. `mensagemBoasVindas`/`logoUrl`/`cicloId`
+ * aceitam `null` explícito para "limpar" o campo — distinto de omitido ("não
+ * alterar"), mesmo padrão `'campo' in dto` já usado pelo backend. Nunca envie
+ * string vazia como substituto de `null`.
+ *
+ * `cicloId` é o ÚNICO caminho de escrita para vincular/desvincular uma
+ * pesquisa a um ciclo — não existe (e não deve ser criada) nenhuma rota
+ * equivalente em `ciclosService.ts`. Vincular (`cicloId` não nulo) exige
+ * `pesquisas.status === 'publicada'` no backend (`409 PESQUISA_NAO_PUBLICADA`
+ * caso contrário); desvincular (`cicloId: null`) não tem restrição de
+ * status. Esta rota NÃO checa o status do ciclo — qualquer trava de "só
+ * vincular/desvincular com o ciclo em rascunho" é decisão de UX puramente
+ * client-side (ver `CicloDetalhePage`).
  */
 export interface AtualizarPesquisaPayload {
   titulo?: string
   mensagemBoasVindas?: string | null
   logoUrl?: string | null
+  cicloId?: string | null
 }
 
 /**

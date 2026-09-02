@@ -28,7 +28,6 @@ export function PesquisaConstrutorPage() {
   // --- Modo criação ---
   const [tituloCriacao, setTituloCriacao] = useState('')
   const [mensagemCriacao, setMensagemCriacao] = useState('')
-  const [logoUrlCriacao, setLogoUrlCriacao] = useState('')
   const [criando, setCriando] = useState(false)
   const [erroCriacao, setErroCriacao] = useState<string | null>(null)
 
@@ -40,7 +39,6 @@ export function PesquisaConstrutorPage() {
 
   const [tituloHeader, setTituloHeader] = useState('')
   const [mensagemHeader, setMensagemHeader] = useState('')
-  const [logoUrlHeader, setLogoUrlHeader] = useState('')
   const [salvandoHeader, setSalvandoHeader] = useState(false)
   const [erroHeader, setErroHeader] = useState<string | null>(null)
 
@@ -67,7 +65,6 @@ export function PesquisaConstrutorPage() {
       setPesquisa(dadosPesquisa)
       setTituloHeader(dadosPesquisa.titulo)
       setMensagemHeader(dadosPesquisa.mensagemBoasVindas ?? '')
-      setLogoUrlHeader(dadosPesquisa.logoUrl ?? '')
       setCompetencias(dadosCompetencias)
       if (state?.pesquisaInicial) {
         navigate(location.pathname, { replace: true, state: null })
@@ -100,7 +97,6 @@ export function PesquisaConstrutorPage() {
       const nova = await criarPesquisa({
         titulo: tituloCriacao.trim(),
         mensagemBoasVindas: mensagemCriacao.trim() || undefined,
-        logoUrl: logoUrlCriacao.trim() || undefined,
       })
       navigate(`/pesquisas/${nova.id}/editar`, { replace: true, state: { pesquisaInicial: nova } })
     } catch (err) {
@@ -125,7 +121,6 @@ export function PesquisaConstrutorPage() {
         // campo — o PUT distingue "chave ausente" (não alterar) de "chave
         // presente com null" (limpar), mesmo padrão de `cicloId` no backend.
         mensagemBoasVindas: mensagemHeader.trim() || null,
-        logoUrl: logoUrlHeader.trim() || null,
       })
       setPesquisa((prev) => (prev ? { ...prev, ...atualizada, paginas: prev.paginas } : prev))
       setSnackbar('Alterações salvas com sucesso.')
@@ -236,13 +231,6 @@ export function PesquisaConstrutorPage() {
               minRows={3}
               fullWidth
             />
-            <TextField
-              label="URL do logo"
-              value={logoUrlCriacao}
-              onChange={(e) => setLogoUrlCriacao(e.target.value)}
-              disabled={criando}
-              fullWidth
-            />
             {erroCriacao && (
               <Alert severity="error" role="alert">
                 {erroCriacao}
@@ -340,13 +328,6 @@ export function PesquisaConstrutorPage() {
             disabled={somenteLeitura || salvandoHeader}
             multiline
             minRows={3}
-            fullWidth
-          />
-          <TextField
-            label="URL do logo"
-            value={logoUrlHeader}
-            onChange={(e) => setLogoUrlHeader(e.target.value)}
-            disabled={somenteLeitura || salvandoHeader}
             fullWidth
           />
           {erroHeader && (

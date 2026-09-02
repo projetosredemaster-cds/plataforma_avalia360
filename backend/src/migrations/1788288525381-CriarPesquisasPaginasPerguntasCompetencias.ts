@@ -30,8 +30,8 @@ export class CriarPesquisasPaginasPerguntasCompetencias1788288525381
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         nome varchar(255) NOT NULL,
         descricao text,
+        ativo boolean NOT NULL DEFAULT true,
         criado_em timestamptz NOT NULL DEFAULT now(),
-        atualizado_em timestamptz NOT NULL DEFAULT now(),
         CONSTRAINT uq_competencias_nome UNIQUE (nome)
       )
     `)
@@ -48,6 +48,7 @@ export class CriarPesquisasPaginasPerguntasCompetencias1788288525381
         -- TODO(futuro): adicionar REFERENCES ciclos_avaliacao(id) quando o
         -- módulo de ciclos for criado.
         ciclo_id uuid,
+        criado_por uuid REFERENCES colaboradores(id),
         criado_em timestamptz NOT NULL DEFAULT now(),
         atualizado_em timestamptz NOT NULL DEFAULT now()
       )
@@ -59,8 +60,6 @@ export class CriarPesquisasPaginasPerguntasCompetencias1788288525381
         pesquisa_id uuid NOT NULL REFERENCES pesquisas(id) ON DELETE CASCADE,
         titulo varchar(255),
         ordem integer NOT NULL,
-        criado_em timestamptz NOT NULL DEFAULT now(),
-        atualizado_em timestamptz NOT NULL DEFAULT now(),
         CONSTRAINT uq_paginas_pesquisa_pesquisa_ordem UNIQUE (pesquisa_id, ordem) DEFERRABLE INITIALLY DEFERRED
       )
     `)

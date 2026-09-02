@@ -2,6 +2,7 @@ import cors from 'cors'
 import express from 'express'
 import { env } from './config/env'
 import { authRouter } from './modules/auth/auth.module'
+import { ciclosAvaliacaoRouter } from './modules/ciclos-avaliacao/ciclos-avaliacao.module'
 import { colaboradoresRouter } from './modules/colaboradores/colaboradores.module'
 import { competenciasRouter } from './modules/competencias/competencias.module'
 import { equipesRouter } from './modules/equipes/equipes.module'
@@ -24,6 +25,7 @@ app.use('/api/equipes', equipesRouter)
 app.use('/api/colaboradores', colaboradoresRouter)
 app.use('/api/pesquisas', pesquisasRouter)
 app.use('/api/competencias', competenciasRouter)
+app.use('/api/ciclos', ciclosAvaliacaoRouter)
 
 // Middleware de erro (4 args) precisa ser o último app.use.
 app.use(tratadorErros)
