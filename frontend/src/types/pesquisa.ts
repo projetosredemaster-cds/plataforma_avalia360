@@ -2,6 +2,9 @@ import type { Competencia } from './competencia'
 
 export type StatusPesquisa = 'rascunho' | 'publicada' | 'encerrada'
 
+/** Escolhido na criação da pesquisa (`POST /api/pesquisas`) e IMUTÁVEL depois — nunca aceito em `PUT /api/pesquisas/:id`. */
+export type TipoPesquisa = 'avaliacao_360' | 'clima_geral'
+
 /** Exatamente 4 tipos de pergunta no MVP — nenhum outro deve ser adicionado. */
 export type TipoPergunta = 'likert' | 'texto_aberto' | 'matriz' | 'pessoa'
 
@@ -49,6 +52,7 @@ export interface PesquisaResumo {
   id: string
   titulo: string
   status: StatusPesquisa
+  tipo: TipoPesquisa
   cicloId: string | null
   criadoEm: string
   atualizadoEm: string
@@ -61,6 +65,7 @@ export interface Pesquisa {
   mensagemBoasVindas: string | null
   logoUrl: string | null
   status: StatusPesquisa
+  tipo: TipoPesquisa
   cicloId: string | null
   paginas: Pagina[]
   criadoEm: string

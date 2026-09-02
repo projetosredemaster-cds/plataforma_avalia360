@@ -211,6 +211,20 @@ export async function criar(
   pesquisasService.garantirEditavel(pesquisa)
 
   const tipo = validarEnum(dto.tipo, TIPO_PERGUNTA_VALORES, 'tipo')
+
+  // Nova nesta task: pergunta `pessoa` pressupõe um universo
+  // avaliador↔avaliado (relacionamentos_avaliacao), que só existe para
+  // pesquisas `avaliacao_360` — `clima_geral` nunca gera
+  // relacionamentos_avaliacao (ver ciclos-avaliacao.service.ts,
+  // atualizarStatus). `pesquisa` já foi buscada acima, nenhuma query nova.
+  if (tipo === 'pessoa' && pesquisa.tipo === 'clima_geral') {
+    throw new ErroHttp(
+      422,
+      'TIPO_PERGUNTA_INVALIDO_PARA_PESQUISA',
+      'Pergunta do tipo "pessoa" não é permitida em pesquisas do tipo "clima_geral".',
+    )
+  }
+
   const enunciado = validarTextoObrigatorio(dto.enunciado, { campo: 'enunciado', min: 2 })
 
   const obrigatoria = dto.obrigatoria !== undefined ? Boolean(dto.obrigatoria) : true
@@ -276,6 +290,19 @@ export async function atualizar(
 
   const tipoResultante =
     dto.tipo !== undefined ? validarEnum(dto.tipo, TIPO_PERGUNTA_VALORES, 'tipo') : pergunta.tipo
+
+  // Mesma regra de criar() — revalidada mesmo quando `dto.tipo` não é
+  // reenviado, para o caso (hoje inatingível pela própria checagem de
+  // criar(), mas defendido aqui por consistência/defesa em profundidade) de
+  // uma pergunta `pessoa` já existente numa pesquisa que de alguma forma
+  // seja `clima_geral`.
+  if (tipoResultante === 'pessoa' && pesquisa.tipo === 'clima_geral') {
+    throw new ErroHttp(
+      422,
+      'TIPO_PERGUNTA_INVALIDO_PARA_PESQUISA',
+      'Pergunta do tipo "pessoa" não é permitida em pesquisas do tipo "clima_geral".',
+    )
+  }
 
   if (dto.enunciado !== undefined) {
     pergunta.enunciado = validarTextoObrigatorio(dto.enunciado, { campo: 'enunciado', min: 2 })

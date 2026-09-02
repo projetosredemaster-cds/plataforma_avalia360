@@ -12,12 +12,6 @@ interface ErrosCampo {
   minimoRespostasPares?: string
 }
 
-/**
- * Só criação (`/ciclos/novo`) — a edição de um ciclo em rascunho vive em
- * `CicloDetalhePage`, que reaproveita os mesmos campos como subcomponente
- * local. Ciclo nasce sempre em `rascunho`, sem participantes/pesquisa
- * vinculada — essas ações só existem depois de `id` existir.
- */
 export function CicloFormPage() {
   const navigate = useNavigate()
 
@@ -145,7 +139,7 @@ export function CicloFormPage() {
           error={Boolean(errosCampo.minimoRespostasPares)}
           helperText={
             errosCampo.minimoRespostasPares ??
-            'Quantidade mínima de respondentes exigida antes de a plataforma liberar dados agregados de pares/subordinado (regra aplicada pelo backend).'
+            'Só mostra o resultado de colegas/liderados quando pelo menos esse número de pessoas já tiver respondido, para não dar pra identificar quem disse o quê.'
           }
           disabled={salvando}
           slotProps={{ htmlInput: { min: 1, step: 1 } }}
@@ -160,7 +154,7 @@ export function CicloFormPage() {
               disabled={salvando}
             />
           }
-          label="Anonimizar respostas de pares/subordinado (política de exposição de respostas do ciclo, aplicada pelo backend)"
+          label="Esconde quem respondeu quando a avaliação vem de um colega ou de um liderado avaliando o gestor."
         />
 
         {erroGeral && (

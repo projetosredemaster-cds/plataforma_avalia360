@@ -6,10 +6,10 @@ import { ApiError } from '../../lib/apiClient'
 import { atualizarPagina, removerPagina } from '../../services/paginasService'
 import { atualizarPergunta, criarPergunta, removerPergunta, reordenarPerguntas } from '../../services/perguntasService'
 import type { Competencia } from '../../types/competencia'
-import type { AtualizarPerguntaPayload, Pagina, PerguntaPayload, TipoPergunta } from '../../types/pesquisa'
+import type { AtualizarPerguntaPayload, Pagina, PerguntaPayload, TipoPergunta, TipoPesquisa } from '../../types/pesquisa'
 import { PerguntaRascunhoCard } from './PerguntaRascunhoCard'
 
-const TIPO_OPCOES: { valor: TipoPergunta; label: string }[] = [
+const TIPO_OPCOES_BASE: { valor: TipoPergunta; label: string }[] = [
   { valor: 'likert', label: 'Likert' },
   { valor: 'texto_aberto', label: 'Texto aberto' },
   { valor: 'matriz', label: 'Matriz' },
@@ -19,6 +19,8 @@ const TIPO_OPCOES: { valor: TipoPergunta; label: string }[] = [
 interface PaginaEditorProps {
   pesquisaId: string
   pagina: Pagina
+  /** Pergunta `pessoa` pressupõe um universo avaliador↔avaliado, que não existe para `clima_geral` — oculta essa opção do seletor de tipo de pergunta abaixo. */
+  tipoPesquisa: TipoPesquisa
   /** Buscada uma vez pela página avó (`PesquisaConstrutorPage`), repassada até `PerguntaMatrizEditor`. */
   competencias: Competencia[]
   somenteLeitura: boolean
@@ -40,6 +42,7 @@ interface PaginaEditorProps {
 export function PaginaEditor({
   pesquisaId,
   pagina,
+  tipoPesquisa,
   competencias,
   somenteLeitura,
   podeMoverCima,
@@ -173,6 +176,13 @@ export function PaginaEditor({
 
   const perguntasOrdenadas = [...pagina.perguntas].sort((a, b) => a.ordem - b.ordem)
 
+  // "Pessoa" pressupõe um universo avaliador↔avaliado (relacionamentos_avaliacao),
+  // que não existe para pesquisas `clima_geral` — oculta a opção do seletor.
+  const tipoOpcoes =
+    tipoPesquisa === 'clima_geral'
+      ? TIPO_OPCOES_BASE.filter((opcao) => opcao.valor !== 'pessoa')
+      : TIPO_OPCOES_BASE
+
   return (
     <Card variant="outlined">
       <CardContent className="flex flex-col gap-4">
@@ -245,7 +255,7 @@ export function PaginaEditor({
               sx={{ minWidth: 200 }}
               size="small"
             >
-              {TIPO_OPCOES.map((opcao) => (
+              {tipoOpcoes.map((opcao) => (
                 <MenuItem key={opcao.valor} value={opcao.valor}>
                   {opcao.label}
                 </MenuItem>

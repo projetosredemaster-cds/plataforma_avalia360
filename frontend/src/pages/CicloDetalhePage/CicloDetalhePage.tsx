@@ -23,12 +23,20 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog'
 import { TabelaEstado } from '../../components/TabelaEstado/TabelaEstado'
 import { StatusCicloChip } from '../../components/ciclos/StatusCicloChip/StatusCicloChip'
+import { StatusEnvioChip } from '../../components/ciclos/StatusEnvioChip/StatusEnvioChip'
 import { ROTULOS_TIPO_RELACIONAMENTO } from '../../components/ciclos/rotulosTipoRelacionamento'
 import { StatusPesquisaChip } from '../../components/pesquisas/StatusPesquisaChip/StatusPesquisaChip'
+import { TipoPesquisaChip } from '../../components/pesquisas/TipoPesquisaChip/TipoPesquisaChip'
 import { ApiError } from '../../lib/apiClient'
 import { listarColaboradores } from '../../services/colaboradoresService'
 import { listarEquipes } from '../../services/equipesService'
 import { atualizarStatusCiclo, buscarCiclo, listarRelacionamentos } from '../../services/ciclosService'
+import {
+  expirarEnvio,
+  listarEnvios,
+  marcarComoEnviado,
+  registrarLembrete,
+} from '../../services/enviosPesquisaService'
 import {
   adicionarParticipantesIndividual,
   adicionarParticipantesPorEquipe,
@@ -38,7 +46,9 @@ import {
 import { atualizarPesquisa, listarPesquisas } from '../../services/pesquisasService'
 import type { Colaborador, Equipe } from '../../types/colaborador'
 import type { Ciclo, Participante, Relacionamento } from '../../types/ciclo'
-import type { PesquisaResumo } from '../../types/pesquisa'
+import { ehEnvioAvaliacao360, ehEnvioClimaGeral } from '../../types/envio'
+import type { EnvioPesquisa } from '../../types/envio'
+import type { PesquisaResumo, TipoPesquisa } from '../../types/pesquisa'
 import { CicloDadosForm } from './CicloDadosForm'
 
 const FORMATADOR_DATA = new Intl.DateTimeFormat('pt-BR')
@@ -49,12 +59,20 @@ function formatarData(data: string): string {
   return FORMATADOR_DATA.format(new Date(`${data}T00:00:00`))
 }
 
+/** Descreve o alvo do `ConfirmDialog` de "Expirar envio" sem assumir avaliador/avaliado (que não existe para clima). */
+function rotuloAlvoExpirar(envio: EnvioPesquisa | null): string {
+  if (!envio) return ''
+  return ehEnvioAvaliacao360(envio)
+    ? `de "${envio.avaliadorNome}" para "${envio.avaliadoNome}"`
+    : `para "${envio.destinatario.nomeCompleto}"`
+}
+
 /**
  * Tela central do motor de ciclos: dados do ciclo (editáveis só em
  * rascunho), participantes, pesquisa vinculada, ativação/encerramento e,
- * quando o ciclo já saiu de rascunho, a tabela de relacionamentos gerados
- * (dado IDENTIFICADO de quem avalia quem — nunca extraída daqui, ver
- * `types/ciclo.ts`).
+ * quando o ciclo já saiu de rascunho, as tabelas de relacionamentos gerados
+ * e de envios (ambas dado IDENTIFICADO de quem avalia quem — nunca
+ * extraídas daqui, ver `types/ciclo.ts` e `types/envio.ts`).
  */
 export function CicloDetalhePage() {
   const { id } = useParams<{ id: string }>()
@@ -73,6 +91,19 @@ export function CicloDetalhePage() {
   const [carregandoRelacionamentos, setCarregandoRelacionamentos] = useState(false)
   const [erroRelacionamentos, setErroRelacionamentos] = useState<string | null>(null)
 
+  const [envios, setEnvios] = useState<EnvioPesquisa[]>([])
+  const [tipoPesquisaEnvios, setTipoPesquisaEnvios] = useState<TipoPesquisa | null>(null)
+  const [carregandoEnvios, setCarregandoEnvios] = useState(false)
+  const [erroEnvios, setErroEnvios] = useState<string | null>(null)
+  const [acaoEmAndamento, setAcaoEmAndamento] = useState<{
+    envioId: string
+    acao: 'marcar-enviado' | 'registrar-lembrete'
+  } | null>(null)
+
+  const [alvoExpirar, setAlvoExpirar] = useState<EnvioPesquisa | null>(null)
+  const [expirando, setExpirando] = useState(false)
+  const [erroExpirar, setErroExpirar] = useState<string | null>(null)
+
   const [selecionadosIndividual, setSelecionadosIndividual] = useState<Colaborador[]>([])
   const [adicionandoIndividual, setAdicionandoIndividual] = useState(false)
   const [erroAdicionarIndividual, setErroAdicionarIndividual] = useState<string | null>(null)
@@ -85,7 +116,9 @@ export function CicloDetalhePage() {
   const [removendoParticipante, setRemovendoParticipante] = useState(false)
   const [erroRemoverParticipante, setErroRemoverParticipante] = useState<string | null>(null)
 
-  const [snackbar, setSnackbar] = useState<string | null>(null)
+  const [snackbar, setSnackbar] = useState<{ mensagem: string; severidade: 'success' | 'info' | 'error' } | null>(
+    null,
+  )
 
   const [pesquisaSelecionadaId, setPesquisaSelecionadaId] = useState('')
   const [salvandoPesquisa, setSalvandoPesquisa] = useState(false)
@@ -114,6 +147,20 @@ export function CicloDetalhePage() {
     }
   }, [])
 
+  const carregarEnvios = useCallback(async (cicloId: string) => {
+    setCarregandoEnvios(true)
+    setErroEnvios(null)
+    try {
+      const resposta = await listarEnvios(cicloId)
+      setEnvios(resposta.envios)
+      setTipoPesquisaEnvios(resposta.tipoPesquisa)
+    } catch (err) {
+      setErroEnvios(err instanceof ApiError ? err.message : 'Não foi possível carregar os envios.')
+    } finally {
+      setCarregandoEnvios(false)
+    }
+  }, [])
+
   const carregar = useCallback(async () => {
     if (!id) return
     setCarregandoInicial(true)
@@ -133,15 +180,26 @@ export function CicloDetalhePage() {
       setEquipes(dadosEquipes)
       // A rota de relacionamentos existe e não erraria em rascunho, mas a
       // lista sempre estaria vazia antes da ativação — evita-se a chamada.
+      // Envios são gerados na mesma transação que relacionamentos (na
+      // ativação), então seguem a mesma condição — chamadas independentes,
+      // uma não bloqueia a outra em caso de falha.
       if (dadosCiclo.status !== 'rascunho') {
-        carregarRelacionamentos(id)
+        const pesquisaDoCiclo = dadosPesquisas.find((p) => p.cicloId === dadosCiclo.id) ?? null
+        // Otimização: pula a chamada de relacionamentos só quando já se SABE
+        // (pela pesquisa vinculada) que é clima_geral — que nunca gera
+        // relacionamentos_avaliacao. Em qualquer outro caso (avaliacao_360 ou
+        // incerto), continua chamando, mesmo comportamento de hoje.
+        if (pesquisaDoCiclo?.tipo !== 'clima_geral') {
+          carregarRelacionamentos(id)
+        }
+        carregarEnvios(id)
       }
     } catch (err) {
       setErroCarregamento(err instanceof ApiError ? err.message : 'Não foi possível carregar o ciclo.')
     } finally {
       setCarregandoInicial(false)
     }
-  }, [id, carregarRelacionamentos])
+  }, [id, carregarRelacionamentos, carregarEnvios])
 
   useEffect(() => {
     // Carga inicial via API — não é dado derivável durante a renderização.
@@ -163,6 +221,19 @@ export function CicloDetalhePage() {
     () => pesquisas.filter((p) => p.status === 'publicada' && p.cicloId === null),
     [pesquisas],
   )
+
+  /**
+   * Fonte de verdade do tipo de pesquisa desta página (ver "Decisões" no
+   * task-frontend.md, item 1): prioriza `pesquisaVinculada` (já carregada,
+   * síncrona com `ciclo`); cai para `tipoPesquisaEnvios` (do envelope de
+   * `listarEnvios`, autoritativo sobre o que foi de fato gerado) só se a
+   * pesquisa tiver sido desvinculada do ciclo depois da ativação — caso
+   * residual que a UI de hoje não permite, mas o backend não bloqueia.
+   */
+  const tipoPesquisaCiclo = pesquisaVinculada?.tipo ?? tipoPesquisaEnvios
+
+  const enviosAvaliacao360 = useMemo(() => envios.filter(ehEnvioAvaliacao360), [envios])
+  const enviosClimaGeral = useMemo(() => envios.filter(ehEnvioClimaGeral), [envios])
 
   async function handleAdicionarIndividual() {
     if (!ciclo || selecionadosIndividual.length === 0) return
@@ -191,7 +262,7 @@ export function CicloDetalhePage() {
     try {
       const atualizados = await adicionarParticipantesPorEquipe(ciclo.id, equipeSelecionada)
       if (atualizados.length === participantes.length) {
-        setSnackbar('Nenhum colaborador novo foi adicionado desta equipe.')
+        setSnackbar({ mensagem: 'Nenhum colaborador novo foi adicionado desta equipe.', severidade: 'info' })
       }
       setParticipantes(atualizados)
       setEquipeSelecionada('')
@@ -273,7 +344,10 @@ export function CicloDetalhePage() {
       const atualizado = await atualizarStatusCiclo(ciclo.id, 'ativo')
       setCiclo(atualizado)
       setConfirmarAtivar(false)
-      carregarRelacionamentos(ciclo.id)
+      if (pesquisaVinculada?.tipo !== 'clima_geral') {
+        carregarRelacionamentos(ciclo.id)
+      }
+      carregarEnvios(ciclo.id)
     } catch (err) {
       setErroAtivar(err instanceof ApiError ? err.message : 'Não foi possível ativar o ciclo.')
     } finally {
@@ -293,6 +367,65 @@ export function CicloDetalhePage() {
       setErroEncerrar(err instanceof ApiError ? err.message : 'Não foi possível encerrar o ciclo.')
     } finally {
       setEncerrando(false)
+    }
+  }
+
+  async function handleCopiarLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link)
+      setSnackbar({ mensagem: 'Link copiado.', severidade: 'success' })
+    } catch {
+      setSnackbar({
+        mensagem: 'Não foi possível copiar o link automaticamente. Copie manualmente.',
+        severidade: 'error',
+      })
+    }
+  }
+
+  async function handleMarcarComoEnviado(envio: EnvioPesquisa) {
+    if (!ciclo) return
+    setAcaoEmAndamento({ envioId: envio.id, acao: 'marcar-enviado' })
+    try {
+      const atualizado = await marcarComoEnviado(ciclo.id, envio.id)
+      setEnvios((prev) => prev.map((e) => (e.id === atualizado.id ? atualizado : e)))
+    } catch (err) {
+      setSnackbar({
+        mensagem: err instanceof ApiError ? err.message : 'Não foi possível marcar o envio como enviado.',
+        severidade: 'error',
+      })
+    } finally {
+      setAcaoEmAndamento(null)
+    }
+  }
+
+  async function handleRegistrarLembrete(envio: EnvioPesquisa) {
+    if (!ciclo) return
+    setAcaoEmAndamento({ envioId: envio.id, acao: 'registrar-lembrete' })
+    try {
+      const atualizado = await registrarLembrete(ciclo.id, envio.id)
+      setEnvios((prev) => prev.map((e) => (e.id === atualizado.id ? atualizado : e)))
+    } catch (err) {
+      setSnackbar({
+        mensagem: err instanceof ApiError ? err.message : 'Não foi possível registrar o lembrete.',
+        severidade: 'error',
+      })
+    } finally {
+      setAcaoEmAndamento(null)
+    }
+  }
+
+  async function handleConfirmarExpirar() {
+    if (!ciclo || !alvoExpirar) return
+    setExpirando(true)
+    setErroExpirar(null)
+    try {
+      const atualizado = await expirarEnvio(ciclo.id, alvoExpirar.id)
+      setEnvios((prev) => prev.map((e) => (e.id === atualizado.id ? atualizado : e)))
+      setAlvoExpirar(null)
+    } catch (err) {
+      setErroExpirar(err instanceof ApiError ? err.message : 'Não foi possível expirar o envio.')
+    } finally {
+      setExpirando(false)
     }
   }
 
@@ -485,6 +618,7 @@ export function CicloDetalhePage() {
             <div className="flex flex-wrap items-center gap-2">
               <Typography>{pesquisaVinculada.titulo}</Typography>
               <StatusPesquisaChip status={pesquisaVinculada.status} />
+              <TipoPesquisaChip tipo={pesquisaVinculada.tipo} />
               <Button size="small" onClick={() => navigate(`/pesquisas/${pesquisaVinculada.id}/editar`)}>
                 Editar pesquisa
               </Button>
@@ -531,7 +665,7 @@ export function CicloDetalhePage() {
         </CardContent>
       </Card>
 
-      {ciclo.status !== 'rascunho' && (
+      {ciclo.status !== 'rascunho' && tipoPesquisaCiclo !== 'clima_geral' && (
         <Card>
           <CardContent className="flex flex-col gap-4">
             <Typography variant="subtitle1">Relacionamentos gerados</Typography>
@@ -568,6 +702,193 @@ export function CicloDetalhePage() {
                         <TableCell>{FORMATADOR_DATA_HORA.format(new Date(relacionamento.criadoEm))}</TableCell>
                       </TableRow>
                     ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {ciclo.status !== 'rascunho' && tipoPesquisaCiclo !== 'clima_geral' && (
+        <Card>
+          <CardContent className="flex flex-col gap-4">
+            <Typography variant="subtitle1">Envios</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Controle manual de envio do link de resposta — o link é copiado e compartilhado pelo admin fora da
+              plataforma (e-mail, WhatsApp, etc.); esta tela só registra o status. Dado identificado — visível apenas
+              para admin/gestor de RH.
+            </Typography>
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Avaliador</TableCell>
+                    <TableCell>Avaliado</TableCell>
+                    <TableCell>Tipo</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Lembretes</TableCell>
+                    <TableCell align="right">Ações</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  <TabelaEstado
+                    colSpan={6}
+                    carregando={carregandoEnvios}
+                    erro={erroEnvios}
+                    vazio={!carregandoEnvios && !erroEnvios && enviosAvaliacao360.length === 0}
+                    mensagemVazio="Nenhum envio gerado ainda."
+                    onTentarNovamente={() => carregarEnvios(ciclo.id)}
+                  />
+                  {!carregandoEnvios &&
+                    !erroEnvios &&
+                    enviosAvaliacao360.map((envio) => {
+                      const acaoAtual =
+                        acaoEmAndamento?.envioId === envio.id ? acaoEmAndamento.acao : null
+                      return (
+                        <TableRow key={envio.id} hover>
+                          <TableCell>{envio.avaliadorNome}</TableCell>
+                          <TableCell>{envio.avaliadoNome}</TableCell>
+                          <TableCell>{ROTULOS_TIPO_RELACIONAMENTO[envio.tipoRelacionamento]}</TableCell>
+                          <TableCell>
+                            <StatusEnvioChip status={envio.status} />
+                          </TableCell>
+                          <TableCell>{envio.quantidadeLembretes}</TableCell>
+                          <TableCell align="right">
+                            <div className="flex flex-wrap justify-end gap-1">
+                              <Button size="small" onClick={() => handleCopiarLink(envio.link)}>
+                                Copiar link
+                              </Button>
+                              <Tooltip title={envio.status !== 'pendente' ? 'Só disponível a partir de "Pendente".' : ''}>
+                                <span>
+                                  <Button
+                                    size="small"
+                                    disabled={envio.status !== 'pendente' || acaoAtual === 'marcar-enviado'}
+                                    onClick={() => handleMarcarComoEnviado(envio)}
+                                  >
+                                    {acaoAtual === 'marcar-enviado' ? 'Aguarde...' : 'Marcar como enviado'}
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                              <Tooltip title={envio.status !== 'enviado' ? 'Só disponível a partir de "Enviado".' : ''}>
+                                <span>
+                                  <Button
+                                    size="small"
+                                    disabled={envio.status !== 'enviado' || acaoAtual === 'registrar-lembrete'}
+                                    onClick={() => handleRegistrarLembrete(envio)}
+                                  >
+                                    {acaoAtual === 'registrar-lembrete'
+                                      ? 'Aguarde...'
+                                      : `Lembrete (${envio.quantidadeLembretes})`}
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                              <Button
+                                size="small"
+                                color="error"
+                                disabled={envio.status === 'expirado'}
+                                onClick={() => {
+                                  setErroExpirar(null)
+                                  setAlvoExpirar(envio)
+                                }}
+                              >
+                                Expirar
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {ciclo.status !== 'rascunho' && tipoPesquisaCiclo === 'clima_geral' && (
+        <Card>
+          <CardContent className="flex flex-col gap-4">
+            <Typography variant="subtitle1">Participantes e envios</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Pesquisa de clima e satisfação — não há relacionamento avaliador↔avaliado (essa dimensão não
+              existe para este tipo de pesquisa). Controle manual de envio do link de resposta, mesmo critério
+              da avaliação 360. Dado identificado — visível apenas para admin/gestor de RH.
+            </Typography>
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Colaborador</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Lembretes</TableCell>
+                    <TableCell align="right">Ações</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  <TabelaEstado
+                    colSpan={4}
+                    carregando={carregandoEnvios}
+                    erro={erroEnvios}
+                    vazio={!carregandoEnvios && !erroEnvios && enviosClimaGeral.length === 0}
+                    mensagemVazio="Nenhum envio gerado ainda."
+                    onTentarNovamente={() => carregarEnvios(ciclo.id)}
+                  />
+                  {!carregandoEnvios &&
+                    !erroEnvios &&
+                    enviosClimaGeral.map((envio) => {
+                      const acaoAtual = acaoEmAndamento?.envioId === envio.id ? acaoEmAndamento.acao : null
+                      return (
+                        <TableRow key={envio.id} hover>
+                          <TableCell>{envio.destinatario.nomeCompleto}</TableCell>
+                          <TableCell>
+                            <StatusEnvioChip status={envio.status} />
+                          </TableCell>
+                          <TableCell>{envio.quantidadeLembretes}</TableCell>
+                          <TableCell align="right">
+                            <div className="flex flex-wrap justify-end gap-1">
+                              <Button size="small" onClick={() => handleCopiarLink(envio.link)}>
+                                Copiar link
+                              </Button>
+                              <Tooltip title={envio.status !== 'pendente' ? 'Só disponível a partir de "Pendente".' : ''}>
+                                <span>
+                                  <Button
+                                    size="small"
+                                    disabled={envio.status !== 'pendente' || acaoAtual === 'marcar-enviado'}
+                                    onClick={() => handleMarcarComoEnviado(envio)}
+                                  >
+                                    {acaoAtual === 'marcar-enviado' ? 'Aguarde...' : 'Marcar como enviado'}
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                              <Tooltip title={envio.status !== 'enviado' ? 'Só disponível a partir de "Enviado".' : ''}>
+                                <span>
+                                  <Button
+                                    size="small"
+                                    disabled={envio.status !== 'enviado' || acaoAtual === 'registrar-lembrete'}
+                                    onClick={() => handleRegistrarLembrete(envio)}
+                                  >
+                                    {acaoAtual === 'registrar-lembrete'
+                                      ? 'Aguarde...'
+                                      : `Lembrete (${envio.quantidadeLembretes})`}
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                              <Button
+                                size="small"
+                                color="error"
+                                disabled={envio.status === 'expirado'}
+                                onClick={() => {
+                                  setErroExpirar(null)
+                                  setAlvoExpirar(envio)
+                                }}
+                              >
+                                Expirar
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -624,10 +945,25 @@ export function CicloDetalhePage() {
         }}
       />
 
+      <ConfirmDialog
+        open={Boolean(alvoExpirar)}
+        titulo="Expirar envio"
+        mensagem={`Marcar o envio ${rotuloAlvoExpirar(alvoExpirar)} como expirado? Esta ação normalmente não tem volta nesta tela.`}
+        confirmarLabel="Expirar"
+        carregando={expirando}
+        erro={erroExpirar}
+        onConfirmar={handleConfirmarExpirar}
+        onCancelar={() => {
+          if (expirando) return
+          setAlvoExpirar(null)
+          setErroExpirar(null)
+        }}
+      />
+
       {snackbar && (
         <Snackbar open autoHideDuration={5000} onClose={() => setSnackbar(null)}>
-          <Alert severity="info" onClose={() => setSnackbar(null)} sx={{ width: '100%' }}>
-            {snackbar}
+          <Alert severity={snackbar.severidade} onClose={() => setSnackbar(null)} sx={{ width: '100%' }}>
+            {snackbar.mensagem}
           </Alert>
         </Snackbar>
       )}

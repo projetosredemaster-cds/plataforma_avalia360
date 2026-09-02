@@ -1,7 +1,12 @@
 import { In } from 'typeorm'
 import { AppDataSource } from '../../data-source'
 import { garantirPapel } from '../../common/autorizacao'
-import { STATUS_PESQUISA_VALORES, type StatusPesquisa } from '../../common/enums'
+import {
+  STATUS_PESQUISA_VALORES,
+  TIPO_PESQUISA_VALORES,
+  type StatusPesquisa,
+  type TipoPesquisa,
+} from '../../common/enums'
 import { ErroHttp } from '../../common/erro-http'
 import { validarEnum, validarTextoObrigatorio } from '../../common/validacao'
 import type { ColaboradorAutenticado } from '../../types/express'
@@ -32,6 +37,7 @@ export interface PesquisaRespostaLista {
   id: string
   titulo: string
   status: StatusPesquisa
+  tipo: TipoPesquisa
   cicloId: string | null
   criadoEm: string
   atualizadoEm: string
@@ -65,6 +71,7 @@ export interface PesquisaRespostaDetalhe {
   mensagemBoasVindas: string | null
   logoUrl: string | null
   status: StatusPesquisa
+  tipo: TipoPesquisa
   cicloId: string | null
   paginas: PaginaAninhada[]
   criadoEm: string
@@ -100,6 +107,7 @@ function mapearPesquisaLista(pesquisa: Pesquisa): PesquisaRespostaLista {
     id: pesquisa.id,
     titulo: pesquisa.titulo,
     status: pesquisa.status,
+    tipo: pesquisa.tipo,
     cicloId: pesquisa.cicloId,
     criadoEm: pesquisa.criadoEm.toISOString(),
     atualizadoEm: pesquisa.atualizadoEm.toISOString(),
@@ -163,6 +171,7 @@ async function montarDetalhe(
     mensagemBoasVindas: pesquisa.mensagemBoasVindas,
     logoUrl: pesquisa.logoUrl,
     status: pesquisa.status,
+    tipo: pesquisa.tipo,
     cicloId: pesquisa.cicloId,
     paginas: paginas.map((pagina) => ({
       id: pagina.id,
@@ -214,12 +223,16 @@ export async function criar(
       ? validarTextoObrigatorio(dto.logoUrl, { campo: 'logoUrl', min: 1, max: 500 })
       : null
 
+  const tipo =
+    dto.tipo !== undefined ? validarEnum(dto.tipo, TIPO_PESQUISA_VALORES, 'tipo') : 'avaliacao_360'
+
   const nova = repositorio().create({
     titulo,
     mensagemBoasVindas,
     logoUrl,
     cicloId: null,
     status: 'rascunho',
+    tipo,
   })
 
   const salva = await repositorio().save(nova)
@@ -255,6 +268,10 @@ export async function atualizar(
 
   const pesquisa = await buscarEntidadeOuFalhar(id)
 
+  // `tipo` é imutável após a criação — `AtualizarPesquisaDto` não declara
+  // esse campo (ver dto/atualizar-pesquisa.dto.ts), então não há nada a
+  // ler/bloquear aqui além de nunca reintroduzir o campo neste DTO.
+
   if (dto.titulo !== undefined) {
     pesquisa.titulo = validarTextoObrigatorio(dto.titulo, { campo: 'titulo', min: 2, max: 255 })
   }
@@ -278,9 +295,29 @@ export async function atualizar(
   }
 
   if ('cicloId' in dto) {
+    // Se a pesquisa já está vinculada a um ciclo, checar o status DESSE
+    // ciclo (o atual, antes da mudança) antes de permitir qualquer alteração
+    // de vínculo — trocar ou desvincular depois que o ciclo foi ativado
+    // quebraria a listagem de envios_pesquisa, que filtra por
+    // pesquisas.ciclo_id.
+    if (pesquisa.cicloId !== null) {
+      const cicloAtual = await AppDataSource.getRepository(CicloAvaliacao).findOneBy({
+        id: pesquisa.cicloId,
+      })
+
+      if (cicloAtual && (cicloAtual.status === 'ativo' || cicloAtual.status === 'encerrado')) {
+        throw new ErroHttp(
+          422,
+          'CICLO_VINCULADO_NAO_EDITAVEL',
+          'Não é possível alterar o vínculo de ciclo desta pesquisa enquanto o ciclo atual estiver ativo ou encerrado.',
+        )
+      }
+    }
+
     if (dto.cicloId === null) {
-      // Desvincular é sempre permitido, independentemente do status da
-      // pesquisa ou do ciclo (decisão assumida 10 do plano da task de ciclos).
+      // Desvincular é permitido quando o ciclo atual está em rascunho (ou
+      // não há vínculo) — decisão assumida 10 do plano da task de ciclos,
+      // agora com a checagem de status acima.
       pesquisa.cicloId = null
     } else {
       const ciclo = await validarCicloExistente(dto.cicloId)
@@ -366,6 +403,7 @@ export async function duplicar(
         logoUrl: detalheOriginal.logoUrl,
         status: 'rascunho',
         cicloId: null,
+        tipo: detalheOriginal.tipo,
       }),
     )
 

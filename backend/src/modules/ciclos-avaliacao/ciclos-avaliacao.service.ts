@@ -7,6 +7,7 @@ import { validarEnum, validarTextoObrigatorio } from '../../common/validacao'
 import type { ColaboradorAutenticado } from '../../types/express'
 import { Colaborador } from '../colaboradores/colaborador.entity'
 import { CicloParticipante } from '../ciclo-participantes/ciclo-participante.entity'
+import { gerarEnviosClima, gerarEnviosPesquisa } from '../envios-pesquisa/envios-pesquisa.service'
 import { Pesquisa } from '../pesquisas/pesquisa.entity'
 import type { AtualizarCicloDto } from './dto/atualizar-ciclo.dto'
 import type { AtualizarStatusCicloDto } from './dto/atualizar-status-ciclo.dto'
@@ -359,7 +360,15 @@ export async function atualizarStatus(
     }
 
     const salvo = await AppDataSource.transaction(async (manager) => {
-      await gerarRelacionamentos(manager, ciclo.id)
+      if (pesquisaPublicada.tipo === 'avaliacao_360') {
+        await gerarRelacionamentos(manager, ciclo.id)
+        await gerarEnviosPesquisa(manager, ciclo.id, pesquisaPublicada.id)
+      } else {
+        // clima_geral: NUNCA gera relacionamentos_avaliacao — guard rail de
+        // anonimização (essa tabela é exclusiva do motor de avaliacao_360 e
+        // da regra de pares/subordinado, que não existe para clima).
+        await gerarEnviosClima(manager, ciclo.id, pesquisaPublicada.id)
+      }
 
       ciclo.status = novoStatus
       return manager.getRepository(CicloAvaliacao).save(ciclo)

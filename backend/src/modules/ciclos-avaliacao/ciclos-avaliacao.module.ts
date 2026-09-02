@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { asyncHandler } from '../../common/http-async'
 import { autenticar } from '../../middlewares/autenticacao'
 import { cicloParticipantesRouter } from '../ciclo-participantes/ciclo-participantes.module'
+import { enviosPesquisaRouter } from '../envios-pesquisa/envios-pesquisa.module'
 import {
   atualizarCiclo,
   atualizarStatusCiclo,
@@ -19,6 +20,7 @@ router.use(autenticar)
 // Sub-router de participantes, montado antes das rotas com :id, path final:
 // /api/ciclos/:cicloId/participantes...
 router.use('/:cicloId/participantes', cicloParticipantesRouter)
+router.use('/:cicloId/envios', enviosPesquisaRouter)
 
 router.post('/', asyncHandler(criarCiclo))
 router.get('/', asyncHandler(listarCiclos))

@@ -52,3 +52,36 @@ export const TIPO_RELACIONAMENTO_VALORES: TipoRelacionamento[] = [
   'subordinado',
   'externo',
 ]
+
+/**
+ * Reflete o enum Postgres `status_envio`, criado pela migration do módulo
+ * `envios-pesquisa`. Esta task só implementa as transições
+ * pendente→enviado, enviado→enviado (lembrete, sem mudar status) e
+ * qualquer-status→expirado. `em_andamento`/`concluido` são reservados para a
+ * futura página pública `/responder` (fora de escopo aqui) — nenhuma rota
+ * desta task escreve esses dois valores.
+ */
+export type StatusEnvio = 'pendente' | 'enviado' | 'em_andamento' | 'concluido' | 'expirado'
+
+export const STATUS_ENVIO_VALORES: StatusEnvio[] = [
+  'pendente',
+  'enviado',
+  'em_andamento',
+  'concluido',
+  'expirado',
+]
+
+/**
+ * Reflete o enum Postgres `tipo_pesquisa`, criado pela migration desta task
+ * (`ALTER TABLE pesquisas ADD COLUMN tipo ...`). Escolhido em
+ * `POST /api/pesquisas` e IMUTÁVEL depois — `AtualizarPesquisaDto` não
+ * declara este campo (mesmo critério já usado para `status`, que só muda via
+ * `PATCH /api/pesquisas/:id/status`). `avaliacao_360` gera
+ * `relacionamentos_avaliacao` + envios ligados a eles na ativação do ciclo;
+ * `clima_geral` gera envios ligados diretamente a `ciclo_participantes`,
+ * SEM `relacionamentos_avaliacao` (ver `ciclos-avaliacao.service.ts`,
+ * `atualizarStatus`, e `envios-pesquisa.service.ts`, `gerarEnviosClima`).
+ */
+export type TipoPesquisa = 'avaliacao_360' | 'clima_geral'
+
+export const TIPO_PESQUISA_VALORES: TipoPesquisa[] = ['avaliacao_360', 'clima_geral']

@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm'
-import { STATUS_PESQUISA_VALORES, type StatusPesquisa } from '../../common/enums'
+import { STATUS_PESQUISA_VALORES, TIPO_PESQUISA_VALORES, type StatusPesquisa, type TipoPesquisa } from '../../common/enums'
 import { CicloAvaliacao } from '../ciclos-avaliacao/ciclo-avaliacao.entity'
 
 @Entity('pesquisas')
@@ -31,6 +31,16 @@ export class Pesquisa {
     default: 'rascunho',
   })
   status!: StatusPesquisa
+
+  // Escolhido em POST /api/pesquisas e IMUTÁVEL depois — AtualizarPesquisaDto
+  // não declara este campo (mesmo critério já usado para `status`).
+  @Column({
+    type: 'enum',
+    enum: TIPO_PESQUISA_VALORES,
+    enumName: 'tipo_pesquisa',
+    default: 'avaliacao_360',
+  })
+  tipo!: TipoPesquisa
 
   @Column({ name: 'ciclo_id', type: 'uuid', nullable: true })
   cicloId!: string | null

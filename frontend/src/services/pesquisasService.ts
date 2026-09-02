@@ -1,11 +1,13 @@
 import { apiFetch } from '../lib/apiClient'
-import type { Pesquisa, PesquisaResumo, StatusPesquisa } from '../types/pesquisa'
+import type { Pesquisa, PesquisaResumo, StatusPesquisa, TipoPesquisa } from '../types/pesquisa'
 
 /** Corpo de `POST /api/pesquisas` — o backend ainda não distingue "ausente" de "null" neste endpoint, então campos opcionais vazios devem ser omitidos (nunca `null`). */
 export interface CriarPesquisaPayload {
   titulo: string
   mensagemBoasVindas?: string
   logoUrl?: string
+  /** Default `'avaliacao_360'` no backend se omitido — o formulário de criação sempre envia explicitamente. */
+  tipo?: TipoPesquisa
 }
 
 /**
@@ -22,6 +24,10 @@ export interface CriarPesquisaPayload {
  * status. Esta rota NÃO checa o status do ciclo — qualquer trava de "só
  * vincular/desvincular com o ciclo em rascunho" é decisão de UX puramente
  * client-side (ver `CicloDetalhePage`).
+ *
+ * `tipo` é IMUTÁVEL após a criação — deliberadamente NÃO declarado aqui (mesmo
+ * critério já usado para `status`, que só muda via
+ * `PATCH /api/pesquisas/:id/status`). Nunca adicionar `tipo` a este payload.
  */
 export interface AtualizarPesquisaPayload {
   titulo?: string

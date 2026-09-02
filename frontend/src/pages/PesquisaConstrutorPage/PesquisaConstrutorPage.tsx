@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Card, CardContent, CircularProgress, Snackbar, TextField, Typography } from '@mui/material'
+import { Alert, Button, Card, CardContent, CircularProgress, MenuItem, Snackbar, TextField, Typography } from '@mui/material'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { StatusPesquisaChip } from '../../components/pesquisas/StatusPesquisaChip/StatusPesquisaChip'
+import { TipoPesquisaChip } from '../../components/pesquisas/TipoPesquisaChip/TipoPesquisaChip'
 import { ApiError } from '../../lib/apiClient'
 import { listarCompetencias } from '../../services/competenciasService'
 import { criarPagina, reordenarPaginas } from '../../services/paginasService'
 import { atualizarPesquisa, atualizarStatusPesquisa, buscarPesquisa, criarPesquisa } from '../../services/pesquisasService'
 import type { Competencia } from '../../types/competencia'
-import type { Pagina, Pesquisa } from '../../types/pesquisa'
+import type { Pagina, Pesquisa, TipoPesquisa } from '../../types/pesquisa'
 import { PaginaEditor } from './PaginaEditor'
 
 interface LocationState {
@@ -28,6 +29,7 @@ export function PesquisaConstrutorPage() {
   // --- Modo criação ---
   const [tituloCriacao, setTituloCriacao] = useState('')
   const [mensagemCriacao, setMensagemCriacao] = useState('')
+  const [tipoCriacao, setTipoCriacao] = useState<TipoPesquisa>('avaliacao_360')
   const [criando, setCriando] = useState(false)
   const [erroCriacao, setErroCriacao] = useState<string | null>(null)
 
@@ -97,6 +99,7 @@ export function PesquisaConstrutorPage() {
       const nova = await criarPesquisa({
         titulo: tituloCriacao.trim(),
         mensagemBoasVindas: mensagemCriacao.trim() || undefined,
+        tipo: tipoCriacao,
       })
       navigate(`/pesquisas/${nova.id}/editar`, { replace: true, state: { pesquisaInicial: nova } })
     } catch (err) {
@@ -223,6 +226,19 @@ export function PesquisaConstrutorPage() {
               fullWidth
             />
             <TextField
+              select
+              label="Tipo de pesquisa"
+              value={tipoCriacao}
+              onChange={(e) => setTipoCriacao(e.target.value as TipoPesquisa)}
+              disabled={criando}
+              helperText="Não pode ser alterado depois de criada."
+              required
+              fullWidth
+            >
+              <MenuItem value="avaliacao_360">Avaliação 360</MenuItem>
+              <MenuItem value="clima_geral">Clima e Satisfação</MenuItem>
+            </TextField>
+            <TextField
               label="Mensagem de boas-vindas"
               value={mensagemCriacao}
               onChange={(e) => setMensagemCriacao(e.target.value)}
@@ -282,6 +298,7 @@ export function PesquisaConstrutorPage() {
             {pesquisa.titulo}
           </Typography>
           <StatusPesquisaChip status={pesquisa.status} />
+          <TipoPesquisaChip tipo={pesquisa.tipo} />
         </div>
         {pesquisa.status === 'rascunho' && (
           <div className="flex flex-col items-end gap-1">
@@ -364,6 +381,7 @@ export function PesquisaConstrutorPage() {
           key={pagina.id}
           pesquisaId={pesquisa.id}
           pagina={pagina}
+          tipoPesquisa={pesquisa.tipo}
           competencias={competencias}
           somenteLeitura={somenteLeitura}
           podeMoverCima={indice > 0}
