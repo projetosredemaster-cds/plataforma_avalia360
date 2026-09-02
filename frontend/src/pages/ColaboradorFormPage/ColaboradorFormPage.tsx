@@ -138,6 +138,10 @@ export function ColaboradorFormPage() {
       }
 
       const resposta = await criarColaborador(payload)
+      // Contrato de três estados: `false` = tentou enviar o e-mail de definição de
+      // senha e falhou de verdade (papel admin/gestor_rh); `null` = papel sem conta
+      // de login (colaborador comum), não aplicável; `true` = enviado com sucesso.
+      // Só `false` deve disparar o aviso abaixo.
       if (resposta.emailDefinicaoSenhaEnviado === false) {
         navigate('/colaboradores', {
           state: {

@@ -31,7 +31,7 @@ export interface ColaboradorResposta {
 }
 
 export interface ColaboradorRespostaCriacao extends ColaboradorResposta {
-  emailDefinicaoSenhaEnviado: boolean
+  emailDefinicaoSenhaEnviado: boolean | null
 }
 
 function repositorio() {
@@ -230,7 +230,7 @@ export async function criar(
   const precisaContaAuth = deveTerContaAuth(papel)
 
   let usuarioAuthId: string | null = null
-  let emailDefinicaoSenhaEnviado = false
+  let emailDefinicaoSenhaEnviado: boolean | null = null
 
   if (precisaContaAuth) {
     usuarioAuthId = await criarContaAuth(email, nomeCompleto)

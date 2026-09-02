@@ -18,7 +18,7 @@ export interface ColaboradorPayload {
 }
 
 export interface CriarColaboradorResposta extends Colaborador {
-  emailDefinicaoSenhaEnviado?: boolean
+  emailDefinicaoSenhaEnviado: boolean | null
 }
 
 export function listarColaboradores(): Promise<Colaborador[]> {

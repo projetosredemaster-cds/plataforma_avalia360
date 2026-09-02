@@ -50,7 +50,7 @@ describe('colaboradores.service', () => {
       expect(supabaseAdmin.auth.resetPasswordForEmail).not.toHaveBeenCalled()
       expect(supabaseAdmin.auth.admin.deleteUser).not.toHaveBeenCalled()
       expect(resposta.usuarioAuthId).toBeNull()
-      expect(resposta.emailDefinicaoSenhaEnviado).toBe(false)
+      expect(resposta.emailDefinicaoSenhaEnviado).toBeNull()
     })
 
     it.each(['admin', 'gestor_rh'] as const)(
