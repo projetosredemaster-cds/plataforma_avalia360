@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm'
 import { STATUS_ENVIO_VALORES, type StatusEnvio } from '../../common/enums'
-import { Colaborador } from '../colaboradores/colaborador.entity'
+import { CicloAvaliacao } from '../ciclos-avaliacao/ciclo-avaliacao.entity'
 import { RelacionamentoAvaliacao } from '../ciclos-avaliacao/relacionamento-avaliacao.entity'
 import { Pesquisa } from '../pesquisas/pesquisa.entity'
 
@@ -26,24 +26,26 @@ export class EnvioPesquisa {
   @JoinColumn({ name: 'pesquisa_id' })
   pesquisa!: Pesquisa
 
-  // Nullable a partir desta task — NULL para envios de pesquisas
-  // `clima_geral` (ver `colaboradorId` abaixo). Exatamente um dos dois é
-  // preenchido, garantido pelo CHECK `chk_envios_pesquisa_origem_exclusiva`
-  // no banco — a aplicação nunca deve gravar os dois ou nenhum.
+  // NULL para envios de pesquisas `clima_geral` (ver `cicloId` abaixo).
+  // Exatamente um dos dois é preenchido, garantido pelo CHECK
+  // `chk_envios_pesquisa_origem_exclusiva` no banco — a aplicação nunca deve
+  // gravar os dois ou nenhum.
   @Column({ name: 'relacionamento_id', type: 'uuid', nullable: true })
   relacionamentoId!: string | null
   @ManyToOne(() => RelacionamentoAvaliacao, { nullable: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'relacionamento_id' })
   relacionamento!: RelacionamentoAvaliacao | null
 
-  // Novo nesta task — preenchido SÓ para envios de pesquisas `clima_geral`
-  // (1 por `ciclo_participantes`, sem relacionamento avaliador↔avaliado).
-  // Nunca gerado/lido junto de `relacionamentoId` na mesma linha.
-  @Column({ name: 'colaborador_id', type: 'uuid', nullable: true })
-  colaboradorId!: string | null
-  @ManyToOne(() => Colaborador, { nullable: true, onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'colaborador_id' })
-  colaborador!: Colaborador | null
+  // Substitui `colaboradorId` (modelo anterior, 1 envio por participante).
+  // Preenchido SÓ para pesquisas `clima_geral` — 1 ÚNICO envio (link de
+  // campanha) por ciclo, garantido pelo índice único parcial
+  // `uq_envios_pesquisa_ciclo`. Nunca gerado/lido junto de
+  // `relacionamentoId` na mesma linha.
+  @Column({ name: 'ciclo_id', type: 'uuid', nullable: true })
+  cicloId!: string | null
+  @ManyToOne(() => CicloAvaliacao, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'ciclo_id' })
+  ciclo!: CicloAvaliacao | null
 
   @Column({ type: 'enum', enum: STATUS_ENVIO_VALORES, enumName: 'status_envio', default: 'pendente' })
   status!: StatusEnvio

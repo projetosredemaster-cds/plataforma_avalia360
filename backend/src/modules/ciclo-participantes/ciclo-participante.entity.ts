@@ -27,6 +27,14 @@ export class CicloParticipante {
   @JoinColumn({ name: 'colaborador_id' })
   colaborador!: Colaborador
 
+  // Metadado de controle de PARTICIPAÇÃO (quem já respondeu à pesquisa de
+  // `clima_geral` do ciclo) — NUNCA conteúdo de resposta. Escrito só pela
+  // futura rota pública `/responder` (fora de escopo desta task) após
+  // validar CPF contra este mesmo participante — esta task NUNCA escreve
+  // esta coluna, só cria e expõe (sempre `null` por ora).
+  @Column({ name: 'respondeu_em', type: 'timestamptz', nullable: true })
+  respondeuEm!: Date | null
+
   @CreateDateColumn({ name: 'criado_em' })
   criadoEm!: Date
 }

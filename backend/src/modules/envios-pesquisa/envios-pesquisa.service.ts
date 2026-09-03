@@ -23,7 +23,7 @@ interface EnvioComumResposta {
   concluidoEm: string | null
 }
 
-/** Envio gerado a partir de `relacionamentos_avaliacao` (pesquisa `avaliacao_360`). */
+/** Envio gerado a partir de `relacionamentos_avaliacao` (pesquisa `avaliacao_360`). SEM MUDANÇA nesta task. */
 export interface EnvioAvaliacao360Resposta extends EnvioComumResposta {
   origem: 'relacionamento'
   avaliadorId: string
@@ -34,31 +34,61 @@ export interface EnvioAvaliacao360Resposta extends EnvioComumResposta {
 }
 
 /**
- * Envio gerado a partir de `ciclo_participantes` (pesquisa `clima_geral`) —
- * sem avaliador/avaliado, só o destinatário do link. `destinatario` é
- * IDENTIFICADO (nome completo) mas isso é dado estrutural de controle de
- * envio, não resposta — ver "Guard rails de anonimização" no plano.
+ * O ÚNICO envio (link de campanha) de uma pesquisa `clima_geral` — 1 por
+ * ciclo (garantido pelo índice único parcial `uq_envios_pesquisa_ciclo`).
+ * Sem `destinatario`: não representa mais 1 pessoa, e sim a campanha
+ * inteira — a lista de destinatários/participantes vive em
+ * `ListarEnviosCicloRespostaClimaGeral.participantes`, não aqui.
  */
-export interface EnvioClimaGeralResposta extends EnvioComumResposta {
-  origem: 'colaborador'
-  destinatario: { id: string; nomeCompleto: string }
+export interface EnvioClimaGeralCampanhaResposta extends EnvioComumResposta {
+  origem: 'ciclo'
 }
 
-export type EnvioCicloResposta = EnvioAvaliacao360Resposta | EnvioClimaGeralResposta
+/** Retorno das 3 ações (`marcar-enviado`/`registrar-lembrete`/`expirar`) — o item único atualizado. */
+export type EnvioAcaoResposta = EnvioAvaliacao360Resposta | EnvioClimaGeralCampanhaResposta
 
 /**
- * Resposta de `GET /api/ciclos/:cicloId/envios`. `tipoPesquisa` não é
- * repetido por item porque uma ativação de ciclo sempre gera envios para
- * UMA ÚNICA pesquisa (mesmo `pesquisaId` passado a
- * `gerarEnviosPesquisa`/`gerarEnviosClima`) — permite ao frontend decidir a
- * seção/colunas certas com um único `if`. `null` SOMENTE quando `envios`
- * está vazio (ciclo ainda não ativado, nenhum envio gerado ainda) — nunca
- * interpretar como erro.
+ * Participante do ciclo, para o braço `clima_geral` de
+ * `GET /api/ciclos/:cicloId/envios` — `respondeuEm` é metadado de controle
+ * de participação (NUNCA conteúdo de resposta), sempre `null` nesta task
+ * (nenhuma rota o escreve; reservado para a futura página pública
+ * `/responder`).
  */
-export interface ListarEnviosCicloResposta {
-  tipoPesquisa: TipoPesquisa | null
-  envios: EnvioCicloResposta[]
+export interface ParticipanteClimaResposta {
+  id: string
+  colaboradorId: string
+  nomeCompleto: string
+  respondeuEm: string | null
 }
+
+export interface ListarEnviosCicloRespostaVazia {
+  tipoPesquisa: null
+  envios: []
+}
+
+export interface ListarEnviosCicloRespostaAvaliacao360 {
+  tipoPesquisa: 'avaliacao_360'
+  envios: EnvioAvaliacao360Resposta[]
+}
+
+export interface ListarEnviosCicloRespostaClimaGeral {
+  tipoPesquisa: 'clima_geral'
+  campanha: EnvioClimaGeralCampanhaResposta
+  participantes: ParticipanteClimaResposta[]
+}
+
+/**
+ * Resposta de `GET /api/ciclos/:cicloId/envios`. `tipoPesquisa: null`
+ * SOMENTE quando o ciclo ainda não foi ativado (nenhum envio gerado ainda)
+ * — nunca interpretar como erro. `avaliacao_360` mantém o shape anterior
+ * (array `envios`) sem NENHUMA mudança. `clima_geral` muda de shape: em vez
+ * de um item por participante, um único objeto `campanha` (o link) + a lista
+ * `participantes` (quem está no ciclo + `respondeuEm`).
+ */
+export type ListarEnviosCicloResposta =
+  | ListarEnviosCicloRespostaVazia
+  | ListarEnviosCicloRespostaAvaliacao360
+  | ListarEnviosCicloRespostaClimaGeral
 
 function montarLinkPublico(tokenAcesso: string): string {
   // Página `/responder` ainda não existe (próximo item do roadmap) — só a
@@ -68,11 +98,8 @@ function montarLinkPublico(tokenAcesso: string): string {
 
 /**
  * Gera `envios_pesquisa` a partir dos `relacionamentos_avaliacao` recém-
- * criados/existentes do ciclo — 1 envio por relacionamento, vinculado à
- * pesquisa publicada do ciclo. Função interna, chamada só por
- * `ciclos-avaliacao.service.ts` (`atualizarStatus`), dentro da MESMA
- * transação que gera os relacionamentos — nunca fora de uma transação.
- * Idempotente via `.orIgnore()` sobre `unique (pesquisa_id, relacionamento_id)`.
+ * criados/existentes do ciclo — 1 envio por relacionamento. SEM MUDANÇA
+ * nesta task (reproduzida aqui por completude do arquivo).
  */
 export async function gerarEnviosPesquisa(
   manager: EntityManager,
@@ -101,52 +128,46 @@ export async function gerarEnviosPesquisa(
 }
 
 /**
- * Gera `envios_pesquisa` a partir de `ciclo_participantes` — 1 envio por
- * participante, `colaboradorId` preenchido e `relacionamentoId` NULL.
- * Usada EXCLUSIVAMENTE para pesquisas `clima_geral` (ver
- * `ciclos-avaliacao.service.ts`, `atualizarStatus`) — NUNCA gera
- * `relacionamentos_avaliacao` (guard rail de anonimização: essa tabela e a
- * regra de pares/subordinado são exclusivas do motor de `avaliacao_360`).
- * Função interna, chamada só dentro da MESMA transação de ativação do
- * ciclo. Idempotente via `.orIgnore()` sobre o índice único parcial
- * `uq_envios_pesquisa_colaborador (pesquisa_id, colaborador_id) WHERE
- * colaborador_id IS NOT NULL`.
+ * Gera o ÚNICO `envios_pesquisa` (link de campanha) do ciclo, para
+ * pesquisas `clima_geral` — `cicloId` preenchido, `relacionamentoId: null`.
+ * REESCRITA nesta task: antes gerava 1 envio por `ciclo_participantes`
+ * (`colaboradorId` preenchido); agora gera exatamente 1 linha por ciclo,
+ * sem depender de ler `ciclo_participantes` (a checagem
+ * `CICLO_SEM_PARTICIPANTES`, em `ciclos-avaliacao.service.ts`, já garante
+ * que existe ao menos 1 participante antes desta função rodar — mas o link
+ * da campanha não depende de QUANTOS participantes existem, ver decisão de
+ * modelagem 6 do plano). NUNCA gera `relacionamentos_avaliacao` (guard rail
+ * de anonimização, inalterado). Idempotente via `.orIgnore()` sobre o
+ * índice único parcial `uq_envios_pesquisa_ciclo (ciclo_id) WHERE ciclo_id
+ * IS NOT NULL`. Assinatura inalterada — `ciclos-avaliacao.service.ts` não
+ * precisa de nenhuma mudança.
  */
 export async function gerarEnviosClima(
   manager: EntityManager,
   cicloId: string,
   pesquisaId: string,
 ): Promise<void> {
-  const participantes = await manager.getRepository(CicloParticipante).find({ where: { cicloId } })
-
-  if (participantes.length === 0) return
-
   await manager
     .createQueryBuilder()
     .insert()
     .into(EnvioPesquisa)
-    .values(
-      participantes.map((p) => ({
-        pesquisaId,
-        relacionamentoId: null,
-        colaboradorId: p.colaboradorId,
-        status: 'pendente' as const,
-      })),
-    )
+    .values({
+      pesquisaId,
+      relacionamentoId: null,
+      cicloId,
+      status: 'pendente' as const,
+    })
     .orIgnore()
     .execute()
 }
 
 /**
- * Busca um envio garantindo que pertence ao ciclo informado. Filtro trocado
- * nesta task: de `relacionamentos_avaliacao.ciclo_id` (quebrava para
- * envios `clima_geral`, que têm `relacionamento_id = NULL` e por isso
- * nunca combinavam com um INNER JOIN nessa tabela) para
- * `pesquisas.ciclo_id` — funciona uniformemente para as duas origens,
- * porque TODO envio (de qualquer origem) tem `pesquisa_id` preenchido, e
- * essa é a MESMA pesquisa (`pesquisaPublicada`) já resolvida e vinculada ao
- * ciclo pela checagem `CICLO_SEM_PESQUISA_PUBLICADA` existente antes da
- * geração.
+ * Busca um envio garantindo que pertence ao ciclo informado, via
+ * `pesquisas.ciclo_id` — SEM MUDANÇA nesta task. Já era origem-agnóstico
+ * (não depende de `colaborador_id`/`ciclo_id` da própria linha de
+ * `envios_pesquisa` para localizar o envio dentro do ciclo), então continua
+ * funcionando sem alteração tanto para `avaliacao_360` quanto para o novo
+ * modelo de `clima_geral`.
  */
 async function buscarEnvioDoCicloOuFalhar(cicloId: string, envioId: string): Promise<EnvioPesquisa> {
   const envio = await AppDataSource.getRepository(EnvioPesquisa)
@@ -164,13 +185,14 @@ async function buscarEnvioDoCicloOuFalhar(cicloId: string, envioId: string): Pro
 }
 
 /**
- * Query base com LEFT JOIN para as duas origens possíveis — reaproveitada
- * por `listarPorCiclo` e por `buscarEnvioComNomes` (usada pelas 3 ações).
+ * Query base — reaproveitada por `listarPorCiclo` (braço `avaliacao_360`) e
+ * por `buscarEnvioComNomes` (usada pelas 3 ações, qualquer origem).
  * `LEFT JOIN` (nunca `INNER JOIN`) em `relacionamentos_avaliacao`/
- * avaliador/avaliado/destinatário: cada linha de `envios_pesquisa` só
- * preenche um dos dois lados (garantido pelo CHECK do banco), então os
- * campos do lado que não se aplica vêm `NULL` do banco — tratado em
- * `mapearLinha`.
+ * avaliador/avaliado: cada linha de `envios_pesquisa` só preenche um dos
+ * dois lados (garantido pelo CHECK do banco) — para uma linha de
+ * `clima_geral`, todos os campos vindos desse `LEFT JOIN` vêm `NULL`,
+ * tratado em `mapearLinha`. O `leftJoin`/`addSelect` de `destinatario`
+ * (modelo anterior) foram REMOVIDOS — não há mais "destinatário" por linha.
  */
 function baseQuery() {
   return AppDataSource.getRepository(EnvioPesquisa)
@@ -179,7 +201,6 @@ function baseQuery() {
     .leftJoin(RelacionamentoAvaliacao, 'r', 'r.id = e.relacionamento_id')
     .leftJoin(Colaborador, 'avaliador', 'avaliador.id = r.avaliador_id')
     .leftJoin(Colaborador, 'avaliado', 'avaliado.id = r.avaliado_id')
-    .leftJoin(Colaborador, 'destinatario', 'destinatario.id = e.colaborador_id')
     .select('e.id', 'id')
     .addSelect('pesquisa.tipo', 'pesquisaTipo')
     .addSelect('e.relacionamento_id', 'relacionamentoId')
@@ -188,8 +209,6 @@ function baseQuery() {
     .addSelect('r.avaliado_id', 'avaliadoId')
     .addSelect('avaliado.nome_completo', 'avaliadoNome')
     .addSelect('r.tipo_relacionamento', 'tipoRelacionamento')
-    .addSelect('e.colaborador_id', 'destinatarioId')
-    .addSelect('destinatario.nome_completo', 'destinatarioNome')
     .addSelect('e.status', 'status')
     .addSelect('e.token_acesso', 'tokenAcesso')
     .addSelect('e.quantidade_lembretes', 'quantidadeLembretes')
@@ -197,12 +216,18 @@ function baseQuery() {
     .addSelect('e.concluido_em', 'concluidoEm')
 }
 
-async function buscarEnvioComNomes(envioId: string): Promise<EnvioCicloResposta> {
+async function buscarEnvioComNomes(envioId: string): Promise<EnvioAcaoResposta> {
   const linha = await baseQuery().where('e.id = :envioId', { envioId }).getRawOne()
   return mapearLinha(linha)
 }
 
-function mapearLinha(linha: any): EnvioCicloResposta {
+/**
+ * Discriminante: presença de `relacionamentoId` (nunca ambos/nenhum,
+ * garantido pelo CHECK `chk_envios_pesquisa_origem_exclusiva` no banco —
+ * agora contra `ciclo_id` em vez de `colaborador_id`, mas a lógica de
+ * discriminação por `relacionamentoId` não muda).
+ */
+function mapearLinha(linha: any): EnvioAcaoResposta {
   const comum: EnvioComumResposta = {
     id: linha.id,
     status: linha.status,
@@ -212,8 +237,6 @@ function mapearLinha(linha: any): EnvioCicloResposta {
     concluidoEm: linha.concluidoEm ? new Date(linha.concluidoEm).toISOString() : null,
   }
 
-  // Discriminante: presença de relacionamentoId (nunca ambos/nenhum,
-  // garantido pelo CHECK chk_envios_pesquisa_origem_exclusiva no banco).
   if (linha.relacionamentoId) {
     return {
       ...comum,
@@ -226,10 +249,15 @@ function mapearLinha(linha: any): EnvioCicloResposta {
     }
   }
 
+  return { ...comum, origem: 'ciclo' }
+}
+
+function mapearParticipanteClima(linha: any): ParticipanteClimaResposta {
   return {
-    ...comum,
-    origem: 'colaborador',
-    destinatario: { id: linha.destinatarioId, nomeCompleto: linha.destinatarioNome },
+    id: linha.id,
+    colaboradorId: linha.colaboradorId,
+    nomeCompleto: linha.nomeCompleto,
+    respondeuEm: linha.respondeuEm ? new Date(linha.respondeuEm).toISOString() : null,
   }
 }
 
@@ -239,30 +267,61 @@ export async function listarPorCiclo(
 ): Promise<ListarEnviosCicloResposta> {
   garantirPapel(ator, [...PAPEIS_COM_ACESSO])
 
-  // Visão IDENTIFICADA de controle de envio (quem-avalia-quem para
-  // avaliacao_360, destinatário para clima_geral) — restrita a
-  // admin/gestor_rh, mesma natureza de GET /api/ciclos/:id/relacionamentos.
-  // Nunca junction com dado de resposta (itens_resposta/respostas ainda não
-  // existem) — só vínculo estrutural + metadados de controle de envio.
+  // Visão IDENTIFICADA de controle de envio — restrita a admin/gestor_rh,
+  // mesma natureza de GET /api/ciclos/:id/relacionamentos. Nunca junction
+  // com dado de resposta (itens_resposta/respostas ainda não existem).
   await buscarCicloOuFalhar(cicloId)
 
   const linhas = await baseQuery()
     .where('pesquisa.ciclo_id = :cicloId', { cicloId })
-    .orderBy('COALESCE(avaliado.nome_completo, destinatario.nome_completo)', 'ASC')
+    .orderBy('avaliado.nome_completo', 'ASC')
     .addOrderBy('r.tipo_relacionamento', 'ASC')
     .getRawMany()
 
-  const envios = linhas.map(mapearLinha)
-  const tipoPesquisa = linhas.length > 0 ? (linhas[0].pesquisaTipo as TipoPesquisa) : null
+  if (linhas.length === 0) {
+    return { tipoPesquisa: null, envios: [] }
+  }
 
-  return { tipoPesquisa, envios }
+  const tipoPesquisa = linhas[0].pesquisaTipo as TipoPesquisa
+
+  if (tipoPesquisa === 'clima_geral') {
+    // Exatamente 1 linha, garantido pelo índice único parcial
+    // uq_envios_pesquisa_ciclo — mapearLinha() sempre retorna o braço
+    // `origem: 'ciclo'` aqui, porque nenhuma linha de clima tem
+    // relacionamentoId preenchido.
+    const campanha = mapearLinha(linhas[0]) as EnvioClimaGeralCampanhaResposta
+
+    const participantesLinhas = await AppDataSource.getRepository(CicloParticipante)
+      .createQueryBuilder('p')
+      .innerJoin(Colaborador, 'c', 'c.id = p.colaborador_id')
+      .select('p.id', 'id')
+      .addSelect('p.colaborador_id', 'colaboradorId')
+      .addSelect('c.nome_completo', 'nomeCompleto')
+      .addSelect('p.respondeu_em', 'respondeuEm')
+      .where('p.ciclo_id = :cicloId', { cicloId })
+      .orderBy('c.nome_completo', 'ASC')
+      .getRawMany()
+
+    return {
+      tipoPesquisa: 'clima_geral',
+      campanha,
+      participantes: participantesLinhas.map(mapearParticipanteClima),
+    }
+  }
+
+  // avaliacao_360: SEM MUDANÇA de comportamento em relação à versão
+  // anterior (mesmas linhas, mesmo mapeamento).
+  return {
+    tipoPesquisa: 'avaliacao_360',
+    envios: linhas.map(mapearLinha) as EnvioAvaliacao360Resposta[],
+  }
 }
 
 export async function marcarComoEnviado(
   ator: ColaboradorAutenticado,
   cicloId: string,
   envioId: string,
-): Promise<EnvioCicloResposta> {
+): Promise<EnvioAcaoResposta> {
   garantirPapel(ator, [...PAPEIS_COM_ACESSO])
 
   await buscarCicloOuFalhar(cicloId)
@@ -287,7 +346,7 @@ export async function registrarLembrete(
   ator: ColaboradorAutenticado,
   cicloId: string,
   envioId: string,
-): Promise<EnvioCicloResposta> {
+): Promise<EnvioAcaoResposta> {
   garantirPapel(ator, [...PAPEIS_COM_ACESSO])
 
   await buscarCicloOuFalhar(cicloId)
@@ -311,15 +370,12 @@ export async function expirarEnvio(
   ator: ColaboradorAutenticado,
   cicloId: string,
   envioId: string,
-): Promise<EnvioCicloResposta> {
+): Promise<EnvioAcaoResposta> {
   garantirPapel(ator, [...PAPEIS_COM_ACESSO])
 
   await buscarCicloOuFalhar(cicloId)
   const envio = await buscarEnvioDoCicloOuFalhar(cicloId, envioId)
 
-  // Requisito 6 do pedido: "qualquer status → expirado", sem pré-condição
-  // (inclusive idempotente se já estiver expirado). Ver "Perguntas em
-  // aberto" (task-backend.md) sobre bloquear a partir de "concluido".
   envio.status = 'expirado'
   await AppDataSource.getRepository(EnvioPesquisa).save(envio)
 

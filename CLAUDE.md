@@ -11,10 +11,11 @@ Plataforma de Avaliação 360° — uma plataforma single-tenant de avaliação 
 - `frontend/` — React 19 + Vite + TypeScript.
 - `backend/` — Node.js + Express + TypeORM + Postgres (Supabase). Já tem `src/` real
   (não é mais greenfield): módulos `auth`, `colaboradores`, `equipes`, `competencias`,
-  `pesquisas`, `paginas-pesquisa` e `perguntas` implementados, com migrations, testes
-  (Vitest) e scripts de build/dev configurados. Módulos futuros (`ciclos_avaliacao`,
-  `relacionamentos_avaliacao`, `envios_pesquisa`, `respostas`, `itens_resposta`) ainda
-  não existem — trate-os como greenfield até serem implementados.
+  `pesquisas`, `paginas-pesquisa`, `perguntas`, `ciclos-avaliacao` (entidades
+  `CicloAvaliacao`/`RelacionamentoAvaliacao`), `ciclo-participantes` e `envios-pesquisa`
+  implementados, com migrations, testes (Vitest) e scripts de build/dev configurados.
+  Módulos futuros (`respostas`, `itens_resposta`) ainda não existem — trate-os como
+  greenfield até serem implementados.
 
 Os agentes/skills do próprio repositório (`.claude/agents/*.md`, `.claude/skills/**/*.md`)
 se referem a estes diretórios como `apps/web` e `apps/api` — essa nomenclatura não existe
@@ -22,10 +23,16 @@ em disco, os diretórios reais são `frontend/` e `backend/`. Leia os arquivos d
 agente/skill com essa substituição em mente.
 
 `docs/schema_avaliacao360_pt_v2.sql` existe no repo — é a fonte de verdade para nomes de
-tabela/coluna dos módulos ainda não implementados. Para os módulos já implementados, a
-migration existente em `backend/src/migrations/` é a fonte de verdade de fato (nenhuma
-das duas migrations foi rodada contra um banco real ainda — dá pra editar in-place em
-vez de gerar uma migration de correção em cima). Divergência conhecida e deliberada
+tabela/coluna dos módulos ainda não implementados. Para os módulos já implementados, as
+migrations existentes em `backend/src/migrations/` (6 arquivos, ver histórico de nomes
+lá) são a fonte de verdade de fato. Nenhuma delas rodou contra um banco real ainda —
+confirme sempre com o usuário antes de decidir entre editar uma migration in-place ou
+gerar uma nova migration de correção em cima (a mais recente,
+`1788450000000-EnvioUnicoClimaGeralPorCiclo.ts`, seguiu o padrão de nova migration de
+correção em vez de editar `1788350000000`/`1788400000000` in-place, por já serem de
+tasks fechadas anteriormente — trate isso como o padrão a seguir: uma vez que uma
+migration corresponde a uma task já fechada, prefira uma nova migration de correção,
+mesmo que nenhuma tenha rodado ainda). Divergência conhecida e deliberada
 entre as duas: o módulo `perguntas` usa `enunciado` (sem `descricao`) e uma tabela
 relacional `perguntas_competencias` para o vínculo matriz↔competência, enquanto o doc de
 schema descreve `titulo`+`descricao` e vínculo via jsonb — já implementado ponta a ponta
@@ -141,16 +148,17 @@ src/modules/<nome>/
 - `@Entity('<nome_tabela>')` e nomes de `@Column()` devem bater exatamente com os nomes
   em português de tabela/coluna do schema (ex.: `colaboradores`, `equipes`,
   `competencias`, `pesquisas`, `paginas_pesquisa`, `perguntas`,
-  `perguntas_competencias` e, quando implementados, `ciclos_avaliacao`,
-  `relacionamentos_avaliacao`) — nunca traduzir de volta para inglês nem inventar nomes.
-  Para módulos ainda não implementados, `docs/schema_avaliacao360_pt_v2.sql` é a
-  referência; para os já implementados, a migration existente é a referência de fato
-  (ver seção "Projeto" sobre a divergência conhecida no módulo `perguntas`).
-- Enums do Postgres (`papel_colaborador`, `tipo_pergunta` e `status_pesquisa` já
-  existem; futuramente `status_ciclo`, `tipo_relacionamento`, `status_envio`) mapeiam
-  para union types TypeScript (`src/common/enums.ts`, ver `PapelColaborador`) com os
-  mesmos valores em português — não usar `enum` nominal do TS para evitar atrito com
-  union types usados em DTOs/tipos de request.
+  `perguntas_competencias`, `ciclos_avaliacao`, `relacionamentos_avaliacao`,
+  `ciclo_participantes`, `envios_pesquisa`) — nunca traduzir de volta para inglês nem
+  inventar nomes. Para módulos ainda não implementados (`respostas`, `itens_resposta`),
+  `docs/schema_avaliacao360_pt_v2.sql` é a referência; para os já implementados, a
+  migration existente é a referência de fato (ver seção "Projeto" sobre a divergência
+  conhecida no módulo `perguntas`).
+- Enums do Postgres (`papel_colaborador`, `tipo_pergunta`, `status_pesquisa`,
+  `status_ciclo`, `tipo_relacionamento` e `status_envio` já existem) mapeiam para union
+  types TypeScript (`src/common/enums.ts`, ver `PapelColaborador`) com os mesmos valores
+  em português — não usar `enum` nominal do TS para evitar atrito com union types
+  usados em DTOs/tipos de request.
 - Nunca depender de `synchronize: true` para mudanças de schema — toda mudança de schema
   precisa de uma migration com `up`/`down` (`src/migrations/`).
 - Checagens de autorização por papel ficam centralizadas na camada de serviço via

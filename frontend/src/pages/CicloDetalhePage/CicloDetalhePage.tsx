@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   CircularProgress,
   MenuItem,
   Paper,
@@ -46,8 +47,13 @@ import {
 import { atualizarPesquisa, listarPesquisas } from '../../services/pesquisasService'
 import type { Colaborador, Equipe } from '../../types/colaborador'
 import type { Ciclo, Participante, Relacionamento } from '../../types/ciclo'
-import { ehEnvioAvaliacao360, ehEnvioClimaGeral } from '../../types/envio'
-import type { EnvioPesquisa } from '../../types/envio'
+import { ehEnvioAvaliacao360, ehEnvioCampanhaClima, ehRespostaAvaliacao360, ehRespostaCampanhaClima } from '../../types/envio'
+import type {
+  EnvioAvaliacao360Resposta,
+  EnvioCampanhaClima,
+  EnvioPesquisaAcao,
+  ParticipanteEnvioClima,
+} from '../../types/envio'
 import type { PesquisaResumo, TipoPesquisa } from '../../types/pesquisa'
 import { CicloDadosForm } from './CicloDadosForm'
 
@@ -60,11 +66,11 @@ function formatarData(data: string): string {
 }
 
 /** Descreve o alvo do `ConfirmDialog` de "Expirar envio" sem assumir avaliador/avaliado (que não existe para clima). */
-function rotuloAlvoExpirar(envio: EnvioPesquisa | null): string {
+function rotuloAlvoExpirar(envio: EnvioPesquisaAcao | null): string {
   if (!envio) return ''
   return ehEnvioAvaliacao360(envio)
     ? `de "${envio.avaliadorNome}" para "${envio.avaliadoNome}"`
-    : `para "${envio.destinatario.nomeCompleto}"`
+    : 'da campanha de clima e satisfação deste ciclo'
 }
 
 /**
@@ -91,7 +97,9 @@ export function CicloDetalhePage() {
   const [carregandoRelacionamentos, setCarregandoRelacionamentos] = useState(false)
   const [erroRelacionamentos, setErroRelacionamentos] = useState<string | null>(null)
 
-  const [envios, setEnvios] = useState<EnvioPesquisa[]>([])
+  const [enviosAvaliacao360, setEnviosAvaliacao360] = useState<EnvioAvaliacao360Resposta[]>([])
+  const [envioCampanhaClima, setEnvioCampanhaClima] = useState<EnvioCampanhaClima | null>(null)
+  const [participantesEnvioClima, setParticipantesEnvioClima] = useState<ParticipanteEnvioClima[]>([])
   const [tipoPesquisaEnvios, setTipoPesquisaEnvios] = useState<TipoPesquisa | null>(null)
   const [carregandoEnvios, setCarregandoEnvios] = useState(false)
   const [erroEnvios, setErroEnvios] = useState<string | null>(null)
@@ -100,7 +108,7 @@ export function CicloDetalhePage() {
     acao: 'marcar-enviado' | 'registrar-lembrete'
   } | null>(null)
 
-  const [alvoExpirar, setAlvoExpirar] = useState<EnvioPesquisa | null>(null)
+  const [alvoExpirar, setAlvoExpirar] = useState<EnvioPesquisaAcao | null>(null)
   const [expirando, setExpirando] = useState(false)
   const [erroExpirar, setErroExpirar] = useState<string | null>(null)
 
@@ -152,8 +160,20 @@ export function CicloDetalhePage() {
     setErroEnvios(null)
     try {
       const resposta = await listarEnvios(cicloId)
-      setEnvios(resposta.envios)
       setTipoPesquisaEnvios(resposta.tipoPesquisa)
+      if (ehRespostaCampanhaClima(resposta)) {
+        setEnvioCampanhaClima(resposta.campanha)
+        setParticipantesEnvioClima(resposta.participantes)
+        setEnviosAvaliacao360([])
+      } else if (ehRespostaAvaliacao360(resposta)) {
+        setEnviosAvaliacao360(resposta.envios)
+        setEnvioCampanhaClima(null)
+        setParticipantesEnvioClima([])
+      } else {
+        setEnviosAvaliacao360([])
+        setEnvioCampanhaClima(null)
+        setParticipantesEnvioClima([])
+      }
     } catch (err) {
       setErroEnvios(err instanceof ApiError ? err.message : 'Não foi possível carregar os envios.')
     } finally {
@@ -231,9 +251,6 @@ export function CicloDetalhePage() {
    * residual que a UI de hoje não permite, mas o backend não bloqueia.
    */
   const tipoPesquisaCiclo = pesquisaVinculada?.tipo ?? tipoPesquisaEnvios
-
-  const enviosAvaliacao360 = useMemo(() => envios.filter(ehEnvioAvaliacao360), [envios])
-  const enviosClimaGeral = useMemo(() => envios.filter(ehEnvioClimaGeral), [envios])
 
   async function handleAdicionarIndividual() {
     if (!ciclo || selecionadosIndividual.length === 0) return
@@ -382,12 +399,21 @@ export function CicloDetalhePage() {
     }
   }
 
-  async function handleMarcarComoEnviado(envio: EnvioPesquisa) {
+  /** Atualiza o slot de state certo (envio de campanha único ou item da lista de avaliação 360), conforme o guard de origem do envio retornado. */
+  function aplicarEnvioAtualizado(atualizado: EnvioPesquisaAcao) {
+    if (ehEnvioCampanhaClima(atualizado)) {
+      setEnvioCampanhaClima(atualizado)
+    } else {
+      setEnviosAvaliacao360((prev) => prev.map((e) => (e.id === atualizado.id ? atualizado : e)))
+    }
+  }
+
+  async function handleMarcarComoEnviado(envio: EnvioPesquisaAcao) {
     if (!ciclo) return
     setAcaoEmAndamento({ envioId: envio.id, acao: 'marcar-enviado' })
     try {
       const atualizado = await marcarComoEnviado(ciclo.id, envio.id)
-      setEnvios((prev) => prev.map((e) => (e.id === atualizado.id ? atualizado : e)))
+      aplicarEnvioAtualizado(atualizado)
     } catch (err) {
       setSnackbar({
         mensagem: err instanceof ApiError ? err.message : 'Não foi possível marcar o envio como enviado.',
@@ -398,12 +424,12 @@ export function CicloDetalhePage() {
     }
   }
 
-  async function handleRegistrarLembrete(envio: EnvioPesquisa) {
+  async function handleRegistrarLembrete(envio: EnvioPesquisaAcao) {
     if (!ciclo) return
     setAcaoEmAndamento({ envioId: envio.id, acao: 'registrar-lembrete' })
     try {
       const atualizado = await registrarLembrete(ciclo.id, envio.id)
-      setEnvios((prev) => prev.map((e) => (e.id === atualizado.id ? atualizado : e)))
+      aplicarEnvioAtualizado(atualizado)
     } catch (err) {
       setSnackbar({
         mensagem: err instanceof ApiError ? err.message : 'Não foi possível registrar o lembrete.',
@@ -420,7 +446,7 @@ export function CicloDetalhePage() {
     setErroExpirar(null)
     try {
       const atualizado = await expirarEnvio(ciclo.id, alvoExpirar.id)
-      setEnvios((prev) => prev.map((e) => (e.id === atualizado.id ? atualizado : e)))
+      aplicarEnvioAtualizado(atualizado)
       setAlvoExpirar(null)
     } catch (err) {
       setErroExpirar(err instanceof ApiError ? err.message : 'Não foi possível expirar o envio.')
@@ -810,88 +836,147 @@ export function CicloDetalhePage() {
           <CardContent className="flex flex-col gap-4">
             <Typography variant="subtitle1">Participantes e envios</Typography>
             <Typography variant="body2" color="text.secondary">
-              Pesquisa de clima e satisfação — não há relacionamento avaliador↔avaliado (essa dimensão não
-              existe para este tipo de pesquisa). Controle manual de envio do link de resposta, mesmo critério
-              da avaliação 360. Dado identificado — visível apenas para admin/gestor de RH.
+              Pesquisa de clima e satisfação — link único, compartilhado com todos os participantes do ciclo. O
+              colaborador acessa o link e confirma o CPF para liberar o formulário. Esta tela só controla o envio
+              do link e mostra quem já respondeu. Dado identificado — visível apenas para admin/gestor de RH.
             </Typography>
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Colaborador</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Lembretes</TableCell>
-                    <TableCell align="right">Ações</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  <TabelaEstado
-                    colSpan={4}
-                    carregando={carregandoEnvios}
-                    erro={erroEnvios}
-                    vazio={!carregandoEnvios && !erroEnvios && enviosClimaGeral.length === 0}
-                    mensagemVazio="Nenhum envio gerado ainda."
-                    onTentarNovamente={() => carregarEnvios(ciclo.id)}
-                  />
-                  {!carregandoEnvios &&
-                    !erroEnvios &&
-                    enviosClimaGeral.map((envio) => {
-                      const acaoAtual = acaoEmAndamento?.envioId === envio.id ? acaoEmAndamento.acao : null
-                      return (
-                        <TableRow key={envio.id} hover>
-                          <TableCell>{envio.destinatario.nomeCompleto}</TableCell>
+
+            {carregandoEnvios && (
+              <div className="flex justify-center py-6">
+                <CircularProgress size={28} />
+              </div>
+            )}
+
+            {!carregandoEnvios && erroEnvios && (
+              <Alert
+                severity="error"
+                role="alert"
+                action={
+                  <Button color="inherit" size="small" onClick={() => carregarEnvios(ciclo.id)}>
+                    Tentar novamente
+                  </Button>
+                }
+              >
+                {erroEnvios}
+              </Alert>
+            )}
+
+            {!carregandoEnvios && !erroEnvios && envioCampanhaClima && (
+              <>
+                <Paper variant="outlined" className="flex flex-col gap-3 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Typography variant="subtitle2">Link da campanha</Typography>
+                    <StatusEnvioChip status={envioCampanhaClima.status} />
+                  </div>
+                  <div className="overflow-x-auto">
+                    <TextField
+                      value={envioCampanhaClima.link}
+                      slotProps={{ input: { readOnly: true } }}
+                      size="small"
+                      fullWidth
+                      sx={{ '& input': { fontFamily: 'monospace' } }}
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="small" onClick={() => handleCopiarLink(envioCampanhaClima.link)}>
+                      Copiar link
+                    </Button>
+                    <Tooltip
+                      title={
+                        envioCampanhaClima.status !== 'pendente' ? 'Só disponível a partir de "Pendente".' : ''
+                      }
+                    >
+                      <span>
+                        <Button
+                          size="small"
+                          disabled={
+                            envioCampanhaClima.status !== 'pendente' ||
+                            (acaoEmAndamento?.envioId === envioCampanhaClima.id &&
+                              acaoEmAndamento.acao === 'marcar-enviado')
+                          }
+                          onClick={() => handleMarcarComoEnviado(envioCampanhaClima)}
+                        >
+                          {acaoEmAndamento?.envioId === envioCampanhaClima.id &&
+                          acaoEmAndamento.acao === 'marcar-enviado'
+                            ? 'Aguarde...'
+                            : 'Marcar como enviado'}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                    <Tooltip
+                      title={
+                        envioCampanhaClima.status !== 'enviado' ? 'Só disponível a partir de "Enviado".' : ''
+                      }
+                    >
+                      <span>
+                        <Button
+                          size="small"
+                          disabled={
+                            envioCampanhaClima.status !== 'enviado' ||
+                            (acaoEmAndamento?.envioId === envioCampanhaClima.id &&
+                              acaoEmAndamento.acao === 'registrar-lembrete')
+                          }
+                          onClick={() => handleRegistrarLembrete(envioCampanhaClima)}
+                        >
+                          {acaoEmAndamento?.envioId === envioCampanhaClima.id &&
+                          acaoEmAndamento.acao === 'registrar-lembrete'
+                            ? 'Aguarde...'
+                            : `Lembrete (${envioCampanhaClima.quantidadeLembretes})`}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                    <Button
+                      size="small"
+                      color="error"
+                      disabled={envioCampanhaClima.status === 'expirado'}
+                      onClick={() => {
+                        setErroExpirar(null)
+                        setAlvoExpirar(envioCampanhaClima)
+                      }}
+                    >
+                      Expirar
+                    </Button>
+                  </div>
+                </Paper>
+
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Colaborador</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Respondido em</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      <TabelaEstado
+                        colSpan={3}
+                        carregando={false}
+                        vazio={participantesEnvioClima.length === 0}
+                        mensagemVazio="Nenhum participante neste ciclo."
+                      />
+                      {participantesEnvioClima.map((participante) => (
+                        <TableRow key={participante.id} hover>
+                          <TableCell>{participante.nomeCompleto}</TableCell>
                           <TableCell>
-                            <StatusEnvioChip status={envio.status} />
+                            <Chip
+                              label={participante.respondeuEm ? 'Respondido' : 'Pendente'}
+                              color={participante.respondeuEm ? 'success' : 'default'}
+                              size="small"
+                            />
                           </TableCell>
-                          <TableCell>{envio.quantidadeLembretes}</TableCell>
-                          <TableCell align="right">
-                            <div className="flex flex-wrap justify-end gap-1">
-                              <Button size="small" onClick={() => handleCopiarLink(envio.link)}>
-                                Copiar link
-                              </Button>
-                              <Tooltip title={envio.status !== 'pendente' ? 'Só disponível a partir de "Pendente".' : ''}>
-                                <span>
-                                  <Button
-                                    size="small"
-                                    disabled={envio.status !== 'pendente' || acaoAtual === 'marcar-enviado'}
-                                    onClick={() => handleMarcarComoEnviado(envio)}
-                                  >
-                                    {acaoAtual === 'marcar-enviado' ? 'Aguarde...' : 'Marcar como enviado'}
-                                  </Button>
-                                </span>
-                              </Tooltip>
-                              <Tooltip title={envio.status !== 'enviado' ? 'Só disponível a partir de "Enviado".' : ''}>
-                                <span>
-                                  <Button
-                                    size="small"
-                                    disabled={envio.status !== 'enviado' || acaoAtual === 'registrar-lembrete'}
-                                    onClick={() => handleRegistrarLembrete(envio)}
-                                  >
-                                    {acaoAtual === 'registrar-lembrete'
-                                      ? 'Aguarde...'
-                                      : `Lembrete (${envio.quantidadeLembretes})`}
-                                  </Button>
-                                </span>
-                              </Tooltip>
-                              <Button
-                                size="small"
-                                color="error"
-                                disabled={envio.status === 'expirado'}
-                                onClick={() => {
-                                  setErroExpirar(null)
-                                  setAlvoExpirar(envio)
-                                }}
-                              >
-                                Expirar
-                              </Button>
-                            </div>
+                          <TableCell>
+                            {participante.respondeuEm
+                              ? FORMATADOR_DATA_HORA.format(new Date(participante.respondeuEm))
+                              : '—'}
                           </TableCell>
                         </TableRow>
-                      )
-                    })}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
