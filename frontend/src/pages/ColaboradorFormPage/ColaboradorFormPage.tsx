@@ -35,12 +35,6 @@ interface ErrosCampo {
   cpf?: string
 }
 
-/**
- * Formulário de criação/edição de colaborador, usado em `/colaboradores/novo`
- * e `/colaboradores/:id/editar`. `ativo` não faz parte deste formulário —
- * inativação/reativação é uma ação própria da listagem
- * (`PATCH /api/colaboradores/:id/status`), não um campo editável aqui.
- */
 export function ColaboradorFormPage() {
   const { id } = useParams<{ id: string }>()
   const isEdicao = Boolean(id)
@@ -138,10 +132,6 @@ export function ColaboradorFormPage() {
       }
 
       const resposta = await criarColaborador(payload)
-      // Contrato de três estados: `false` = tentou enviar o e-mail de definição de
-      // senha e falhou de verdade (papel admin/gestor_rh); `null` = papel sem conta
-      // de login (colaborador comum), não aplicável; `true` = enviado com sucesso.
-      // Só `false` deve disparar o aviso abaixo.
       if (resposta.emailDefinicaoSenhaEnviado === false) {
         navigate('/colaboradores', {
           state: {
@@ -199,41 +189,6 @@ export function ColaboradorFormPage() {
 
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         <TextField
-          label="Nome completo"
-          value={nomeCompleto}
-          onChange={(e) => setNomeCompleto(e.target.value)}
-          error={Boolean(errosCampo.nomeCompleto)}
-          helperText={errosCampo.nomeCompleto}
-          disabled={salvando}
-          required
-          fullWidth
-        />
-
-        <TextField
-          label="E-mail"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={Boolean(errosCampo.email)}
-          helperText={errosCampo.email}
-          disabled={salvando}
-          required
-          fullWidth
-        />
-
-        <TextField
-          label="CPF"
-          value={cpf}
-          onChange={(e) => setCpf(formatarCpf(e.target.value))}
-          error={Boolean(errosCampo.cpf)}
-          helperText={errosCampo.cpf}
-          disabled={salvando}
-          slotProps={{ htmlInput: { inputMode: 'numeric' } }}
-          required
-          fullWidth
-        />
-
-        <TextField
           select
           label="Papel"
           value={papel}
@@ -248,12 +203,61 @@ export function ColaboradorFormPage() {
             </MenuItem>
           ))}
         </TextField>
-
+        
         <Alert severity="info">
           {papel === 'colaborador'
-            ? 'Esta pessoa poderá ser avaliada e avaliar outras pessoas na Avaliação 360°, mas não terá login na plataforma.'
+            ? 'Esta pessoa não terá login na plataforma.'
             : 'Será criada uma conta de acesso para este e-mail. Um e-mail de definição de senha será enviado automaticamente.'}
         </Alert>
+
+        <TextField
+          label="Nome completo"
+          value={nomeCompleto}
+          onChange={(e) => setNomeCompleto(e.target.value)}
+          error={Boolean(errosCampo.nomeCompleto)}
+          helperText={errosCampo.nomeCompleto}
+          disabled={salvando}
+          required
+          fullWidth
+        />
+
+        {papel === 'colaborador' ? 
+        (
+          <TextField
+            label="E-mail"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={Boolean(errosCampo.email)}
+            helperText={errosCampo.email}
+            disabled={salvando}
+            fullWidth
+          />
+        ) : (
+          <TextField
+          label="E-mail"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={Boolean(errosCampo.email)}
+          helperText={errosCampo.email}
+          disabled={salvando}
+          required
+          fullWidth
+        />
+        )}   
+ 
+        <TextField
+          label="CPF"
+          value={cpf}
+          onChange={(e) => setCpf(formatarCpf(e.target.value))}
+          error={Boolean(errosCampo.cpf)}
+          helperText={errosCampo.cpf}
+          disabled={salvando}
+          slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+          required
+          fullWidth
+        />
 
         <TextField
           label="Cargo"
