@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { asyncHandler } from '../../common/http-async'
 import { autenticar } from '../../middlewares/autenticacao'
 import {
+  desbloquearTentativasEnvio,
   expirarEnvioAcao,
   listarEnviosCiclo,
   marcarEnvioComoEnviado,
@@ -21,5 +22,6 @@ router.get('/', asyncHandler(listarEnviosCiclo))
 router.patch('/:id/marcar-enviado', asyncHandler(marcarEnvioComoEnviado))
 router.patch('/:id/registrar-lembrete', asyncHandler(registrarLembreteEnvio))
 router.patch('/:id/expirar', asyncHandler(expirarEnvioAcao))
+router.patch('/:id/desbloquear-tentativas', asyncHandler(desbloquearTentativasEnvio))
 
 export { router as enviosPesquisaRouter }

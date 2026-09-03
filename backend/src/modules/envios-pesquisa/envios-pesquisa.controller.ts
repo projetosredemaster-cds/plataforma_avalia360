@@ -28,3 +28,14 @@ export async function expirarEnvioAcao(req: Request, res: Response): Promise<voi
   const resposta = await enviosPesquisaService.expirarEnvio(req.colaboradorAutenticado!, cicloId, id)
   res.status(200).json(resposta)
 }
+
+export async function desbloquearTentativasEnvio(req: Request, res: Response): Promise<void> {
+  const cicloId = obterParametroRota(req, 'cicloId')
+  const id = obterParametroRota(req, 'id')
+  const resposta = await enviosPesquisaService.desbloquearTentativas(
+    req.colaboradorAutenticado!,
+    cicloId,
+    id,
+  )
+  res.status(200).json(resposta)
+}

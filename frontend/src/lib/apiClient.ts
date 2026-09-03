@@ -23,6 +23,15 @@ export class ApiError extends Error {
 
 interface ApiFetchOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
+  /**
+   * Quando `true`, pula por completo `supabase.auth.getSession()` e nunca
+   * monta o header `Authorization` — usado pelas rotas verdadeiramente
+   * públicas (`/api/publico/**`), que não devem depender de nem enviar
+   * nenhuma credencial de sessão, mesmo quando a mesma aba tiver um
+   * admin/gestor_rh logado. Default `false`: nenhum call-site existente
+   * muda de comportamento.
+   */
+  semAutenticacao?: boolean
 }
 
 function extrairErro(corpo: unknown): { codigo?: string; mensagem?: string } {
@@ -47,8 +56,9 @@ function extrairErro(corpo: unknown): { codigo?: string; mensagem?: string } {
  * (agregação, anonimização, etc.) vive aqui.
  */
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
+  const token = options.semAutenticacao
+    ? undefined
+    : (await supabase.auth.getSession()).data.session?.access_token
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',

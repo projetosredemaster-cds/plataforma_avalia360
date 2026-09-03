@@ -1,4 +1,4 @@
-import { FormControlLabel, FormLabel, Radio, RadioGroup } from '@mui/material'
+import { FormControlLabel, FormHelperText, FormLabel, Radio, RadioGroup } from '@mui/material'
 import type { Competencia } from '../../../types/competencia'
 import type { ConfiguracaoLikert } from '../../../types/pesquisa'
 
@@ -14,6 +14,8 @@ interface PerguntaMatrizRespostaProps {
   competencias: Competencia[]
   valor: RespostaMatriz | null
   onChange: (valor: RespostaMatriz) => void
+  /** Destaca a pergunta como obrigatória não respondida numa tentativa de envio. */
+  erro?: boolean
 }
 
 export function PerguntaMatrizResposta({
@@ -23,6 +25,7 @@ export function PerguntaMatrizResposta({
   competencias,
   valor,
   onChange,
+  erro,
 }: PerguntaMatrizRespostaProps) {
   function handleNotaChange(competenciaId: string, nota: number) {
     onChange({ notas: { ...(valor?.notas ?? {}), [competenciaId]: nota } })
@@ -30,7 +33,7 @@ export function PerguntaMatrizResposta({
 
   return (
     <div className="flex flex-col gap-3">
-      <FormLabel>
+      <FormLabel error={erro}>
         {enunciado}
         {obrigatoria && ' *'}
       </FormLabel>
@@ -48,6 +51,7 @@ export function PerguntaMatrizResposta({
           </RadioGroup>
         </div>
       ))}
+      {erro && <FormHelperText error>Resposta obrigatória.</FormHelperText>}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { Autocomplete, FormLabel, TextField } from '@mui/material'
+import { Autocomplete, FormHelperText, FormLabel, TextField } from '@mui/material'
 
 export interface ColaboradorOpcao {
   id: string
@@ -16,14 +16,23 @@ interface PerguntaPessoaRespostaProps {
   opcoes: ColaboradorOpcao[]
   valor: RespostaPessoa | null
   onChange: (valor: RespostaPessoa) => void
+  /** Destaca a pergunta como obrigatória não respondida numa tentativa de envio. */
+  erro?: boolean
 }
 
-export function PerguntaPessoaResposta({ enunciado, obrigatoria, opcoes, valor, onChange }: PerguntaPessoaRespostaProps) {
+export function PerguntaPessoaResposta({
+  enunciado,
+  obrigatoria,
+  opcoes,
+  valor,
+  onChange,
+  erro,
+}: PerguntaPessoaRespostaProps) {
   const selecionado = opcoes.find((opcao) => opcao.id === valor?.colaboradorId) ?? null
 
   return (
     <div className="flex flex-col gap-2">
-      <FormLabel>
+      <FormLabel error={erro}>
         {enunciado}
         {obrigatoria && ' *'}
       </FormLabel>
@@ -35,8 +44,11 @@ export function PerguntaPessoaResposta({ enunciado, obrigatoria, opcoes, valor, 
         onChange={(_, novoValor) => {
           if (novoValor) onChange({ colaboradorId: novoValor.id })
         }}
-        renderInput={(params) => <TextField {...params} label="Colaborador" />}
+        renderInput={(params) => (
+          <TextField {...params} label="Colaborador" error={erro} />
+        )}
       />
+      {erro && <FormHelperText error>Resposta obrigatória.</FormHelperText>}
     </div>
   )
 }

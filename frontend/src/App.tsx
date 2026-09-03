@@ -12,6 +12,7 @@ import { PesquisaConstrutorPage } from './pages/PesquisaConstrutorPage/PesquisaC
 import { CiclosListPage } from './pages/CiclosListPage/CiclosListPage'
 import { CicloFormPage } from './pages/CicloFormPage/CicloFormPage'
 import { CicloDetalhePage } from './pages/CicloDetalhePage/CicloDetalhePage'
+import { ResponderPesquisaPage } from './pages/ResponderPesquisaPage/ResponderPesquisaPage'
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/definir-senha" element={<DefinirSenhaPage />} />
       <Route path="/acesso-negado" element={<AcessoNegadoPage />} />
+      <Route path="/responder/:token" element={<ResponderPesquisaPage />} />
 
       <Route path="/" element={<RotaProtegida papeis={['admin', 'gestor_rh']} />}>
         <Route index element={<Navigate to="/colaboradores" replace />} />

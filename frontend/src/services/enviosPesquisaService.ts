@@ -22,3 +22,10 @@ export function registrarLembrete(cicloId: string, envioId: string): Promise<Env
 export function expirarEnvio(cicloId: string, envioId: string): Promise<EnvioPesquisaAcao> {
   return apiFetch<EnvioPesquisaAcao>(`/api/ciclos/${cicloId}/envios/${envioId}/expirar`, { method: 'PATCH' })
 }
+
+/** Recuperação do bloqueio por 5 tentativas de CPF inválido no fluxo público (`403 BLOQUEADO_TENTATIVAS_CPF`). */
+export function desbloquearTentativas(cicloId: string, envioId: string): Promise<EnvioPesquisaAcao> {
+  return apiFetch<EnvioPesquisaAcao>(`/api/ciclos/${cicloId}/envios/${envioId}/desbloquear-tentativas`, {
+    method: 'PATCH',
+  })
+}

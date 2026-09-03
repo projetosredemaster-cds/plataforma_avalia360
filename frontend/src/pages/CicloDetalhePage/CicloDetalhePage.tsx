@@ -33,6 +33,7 @@ import { listarColaboradores } from '../../services/colaboradoresService'
 import { listarEquipes } from '../../services/equipesService'
 import { atualizarStatusCiclo, buscarCiclo, listarRelacionamentos } from '../../services/ciclosService'
 import {
+  desbloquearTentativas,
   expirarEnvio,
   listarEnvios,
   marcarComoEnviado,
@@ -105,7 +106,7 @@ export function CicloDetalhePage() {
   const [erroEnvios, setErroEnvios] = useState<string | null>(null)
   const [acaoEmAndamento, setAcaoEmAndamento] = useState<{
     envioId: string
-    acao: 'marcar-enviado' | 'registrar-lembrete'
+    acao: 'marcar-enviado' | 'registrar-lembrete' | 'desbloquear-tentativas'
   } | null>(null)
 
   const [alvoExpirar, setAlvoExpirar] = useState<EnvioPesquisaAcao | null>(null)
@@ -433,6 +434,22 @@ export function CicloDetalhePage() {
     } catch (err) {
       setSnackbar({
         mensagem: err instanceof ApiError ? err.message : 'Não foi possível registrar o lembrete.',
+        severidade: 'error',
+      })
+    } finally {
+      setAcaoEmAndamento(null)
+    }
+  }
+
+  async function handleDesbloquearTentativas(envio: EnvioPesquisaAcao) {
+    if (!ciclo) return
+    setAcaoEmAndamento({ envioId: envio.id, acao: 'desbloquear-tentativas' })
+    try {
+      const atualizado = await desbloquearTentativas(ciclo.id, envio.id)
+      aplicarEnvioAtualizado(atualizado)
+    } catch (err) {
+      setSnackbar({
+        mensagem: err instanceof ApiError ? err.message : 'Não foi possível desbloquear as tentativas.',
         severidade: 'error',
       })
     } finally {
@@ -819,6 +836,17 @@ export function CicloDetalhePage() {
                               >
                                 Expirar
                               </Button>
+                              <Tooltip title={!envio.bloqueadoPorTentativas ? 'Envio não está bloqueado por tentativas.' : ''}>
+                                <span>
+                                  <Button
+                                    size="small"
+                                    disabled={!envio.bloqueadoPorTentativas || acaoAtual === 'desbloquear-tentativas'}
+                                    onClick={() => handleDesbloquearTentativas(envio)}
+                                  >
+                                    {acaoAtual === 'desbloquear-tentativas' ? 'Aguarde...' : 'Desbloquear tentativas'}
+                                  </Button>
+                                </span>
+                              </Tooltip>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -936,6 +964,26 @@ export function CicloDetalhePage() {
                     >
                       Expirar
                     </Button>
+                    <Tooltip
+                      title={!envioCampanhaClima.bloqueadoPorTentativas ? 'Envio não está bloqueado por tentativas.' : ''}
+                    >
+                      <span>
+                        <Button
+                          size="small"
+                          disabled={
+                            !envioCampanhaClima.bloqueadoPorTentativas ||
+                            (acaoEmAndamento?.envioId === envioCampanhaClima.id &&
+                              acaoEmAndamento.acao === 'desbloquear-tentativas')
+                          }
+                          onClick={() => handleDesbloquearTentativas(envioCampanhaClima)}
+                        >
+                          {acaoEmAndamento?.envioId === envioCampanhaClima.id &&
+                          acaoEmAndamento.acao === 'desbloquear-tentativas'
+                            ? 'Aguarde...'
+                            : 'Desbloquear tentativas'}
+                        </Button>
+                      </span>
+                    </Tooltip>
                   </div>
                 </Paper>
 

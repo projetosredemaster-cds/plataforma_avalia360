@@ -9,6 +9,8 @@ interface PerguntaTextoAbertoRespostaProps {
   obrigatoria: boolean
   valor: RespostaTextoAberto | null
   onChange: (valor: RespostaTextoAberto) => void
+  /** Destaca a pergunta como obrigatória não respondida numa tentativa de envio. */
+  erro?: boolean
 }
 
 export function PerguntaTextoAbertoResposta({
@@ -16,14 +18,23 @@ export function PerguntaTextoAbertoResposta({
   obrigatoria,
   valor,
   onChange,
+  erro,
 }: PerguntaTextoAbertoRespostaProps) {
   return (
     <div className="flex flex-col gap-2">
-      <FormLabel>
+      <FormLabel error={erro}>
         {enunciado}
         {obrigatoria && ' *'}
       </FormLabel>
-      <TextField value={valor?.texto ?? ''} onChange={(e) => onChange({ texto: e.target.value })} multiline minRows={3} fullWidth />
+      <TextField
+        value={valor?.texto ?? ''}
+        onChange={(e) => onChange({ texto: e.target.value })}
+        multiline
+        minRows={3}
+        fullWidth
+        error={erro}
+        helperText={erro ? 'Resposta obrigatória.' : undefined}
+      />
     </div>
   )
 }

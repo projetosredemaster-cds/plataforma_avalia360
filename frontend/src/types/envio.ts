@@ -9,6 +9,7 @@ interface EnvioComum {
   quantidadeLembretes: number
   cpfConfirmadoEm: string | null
   concluidoEm: string | null
+  bloqueadoPorTentativas: boolean
 }
 
 /**

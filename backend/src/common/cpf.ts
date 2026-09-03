@@ -1,3 +1,5 @@
+import { timingSafeEqual } from 'node:crypto'
+
 /**
  * Remove tudo que não é dígito. Não valida tamanho — só normaliza.
  * Aceita `unknown` (o body chega como JSON não tipado): qualquer entrada que
@@ -55,4 +57,28 @@ export function validarCpf(cpfDigitos: string): boolean {
   }
 
   return true
+}
+
+/**
+ * Compara dois CPFs (já normalizados/dígitos) em tempo constante
+ * (`crypto.timingSafeEqual`), para o fluxo público de confirmação de CPF
+ * (`coleta-respostas-publica`) não vazar, via timing, quantos dígitos batem
+ * antes de uma divergência — mitigação de timing attack sobre um dado
+ * sensível comparado sem rate limit.
+ *
+ * `timingSafeEqual` lança se os dois buffers tiverem tamanhos diferentes;
+ * como o CPF armazenado no banco é a fonte de verdade e SEMPRE deveria ter 11
+ * dígitos (mas em tese poderia estar corrompido), um tamanho diferente aqui é
+ * tratado como "não bate" (retorna `false`) em vez de deixar o `TypeError`
+ * escapar como `500` — nunca lança.
+ */
+export function compararCpfConstantTime(cpfArmazenado: string, cpfInformado: string): boolean {
+  const bufferArmazenado = Buffer.from(cpfArmazenado, 'utf8')
+  const bufferInformado = Buffer.from(cpfInformado, 'utf8')
+
+  if (bufferArmazenado.length !== bufferInformado.length) {
+    return false
+  }
+
+  return timingSafeEqual(bufferArmazenado, bufferInformado)
 }

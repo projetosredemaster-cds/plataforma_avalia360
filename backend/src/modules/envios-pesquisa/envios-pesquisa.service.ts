@@ -3,6 +3,7 @@ import { AppDataSource } from '../../data-source'
 import { garantirPapel } from '../../common/autorizacao'
 import { env } from '../../config/env'
 import { ErroHttp } from '../../common/erro-http'
+import { LIMITE_TENTATIVAS_CPF_INVALIDAS } from '../../common/limites'
 import type { ColaboradorAutenticado } from '../../types/express'
 import type { TipoPesquisa, TipoRelacionamento } from '../../common/enums'
 import { Colaborador } from '../colaboradores/colaborador.entity'
@@ -21,6 +22,13 @@ interface EnvioComumResposta {
   quantidadeLembretes: number
   cpfConfirmadoEm: string | null
   concluidoEm: string | null
+  // Correção pontual: expostos para o frontend saber quando mostrar a ação
+  // "desbloquear tentativas" (só faz sentido quando bloqueadoPorTentativas
+  // === true). `bloqueadoPorTentativas` é sempre
+  // `tentativasCpfInvalidas >= LIMITE_TENTATIVAS_CPF_INVALIDAS` (mesmo limite
+  // usado por `coleta-respostas-publica.service.ts` para bloquear o envio).
+  tentativasCpfInvalidas: number
+  bloqueadoPorTentativas: boolean
 }
 
 /** Envio gerado a partir de `relacionamentos_avaliacao` (pesquisa `avaliacao_360`). SEM MUDANÇA nesta task. */
@@ -214,6 +222,7 @@ function baseQuery() {
     .addSelect('e.quantidade_lembretes', 'quantidadeLembretes')
     .addSelect('e.cpf_confirmado_em', 'cpfConfirmadoEm')
     .addSelect('e.concluido_em', 'concluidoEm')
+    .addSelect('e.tentativas_cpf_invalidas', 'tentativasCpfInvalidas')
 }
 
 async function buscarEnvioComNomes(envioId: string): Promise<EnvioAcaoResposta> {
@@ -228,6 +237,7 @@ async function buscarEnvioComNomes(envioId: string): Promise<EnvioAcaoResposta> 
  * discriminação por `relacionamentoId` não muda).
  */
 function mapearLinha(linha: any): EnvioAcaoResposta {
+  const tentativasCpfInvalidas = Number(linha.tentativasCpfInvalidas)
   const comum: EnvioComumResposta = {
     id: linha.id,
     status: linha.status,
@@ -235,6 +245,8 @@ function mapearLinha(linha: any): EnvioAcaoResposta {
     quantidadeLembretes: linha.quantidadeLembretes,
     cpfConfirmadoEm: linha.cpfConfirmadoEm ? new Date(linha.cpfConfirmadoEm).toISOString() : null,
     concluidoEm: linha.concluidoEm ? new Date(linha.concluidoEm).toISOString() : null,
+    tentativasCpfInvalidas,
+    bloqueadoPorTentativas: tentativasCpfInvalidas >= LIMITE_TENTATIVAS_CPF_INVALIDAS,
   }
 
   if (linha.relacionamentoId) {
@@ -377,6 +389,45 @@ export async function expirarEnvio(
   const envio = await buscarEnvioDoCicloOuFalhar(cicloId, envioId)
 
   envio.status = 'expirado'
+  await AppDataSource.getRepository(EnvioPesquisa).save(envio)
+
+  return buscarEnvioComNomes(envioId)
+}
+
+/**
+ * Zera `tentativas_cpf_invalidas`, liberando um envio bloqueado pelo fluxo
+ * público (`coleta-respostas-publica.service.ts`, `403
+ * BLOQUEADO_TENTATIVAS_CPF` a partir de `LIMITE_TENTATIVAS_CPF_INVALIDAS`
+ * tentativas). Única ação de recuperação hoje — antes desta correção, só um
+ * `UPDATE` manual no banco desbloqueava. Especialmente relevante para
+ * `clima_geral`: como um único `envios_pesquisa` serve o ciclo inteiro, 5
+ * erros de CPF de QUALQUER participante bloqueava a pesquisa para todo mundo.
+ *
+ * Exige que o envio esteja de fato bloqueado (`409
+ * TRANSICAO_ENVIO_INVALIDA` caso contrário) — mesmo estilo de precondição já
+ * usado por `marcarComoEnviado`/`registrarLembrete`, para não tratar como uma
+ * ação sem efeito colateral relevante (zerar um contador que já está em 0 não
+ * é um estado que faça sentido "confirmar" via UI).
+ */
+export async function desbloquearTentativas(
+  ator: ColaboradorAutenticado,
+  cicloId: string,
+  envioId: string,
+): Promise<EnvioAcaoResposta> {
+  garantirPapel(ator, [...PAPEIS_COM_ACESSO])
+
+  await buscarCicloOuFalhar(cicloId)
+  const envio = await buscarEnvioDoCicloOuFalhar(cicloId, envioId)
+
+  if (envio.tentativasCpfInvalidas < LIMITE_TENTATIVAS_CPF_INVALIDAS) {
+    throw new ErroHttp(
+      409,
+      'TRANSICAO_ENVIO_INVALIDA',
+      'Este envio não está bloqueado por tentativas de CPF inválidas.',
+    )
+  }
+
+  envio.tentativasCpfInvalidas = 0
   await AppDataSource.getRepository(EnvioPesquisa).save(envio)
 
   return buscarEnvioComNomes(envioId)

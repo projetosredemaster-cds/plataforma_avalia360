@@ -7,6 +7,7 @@ interface Env {
   supabaseServiceRoleKey: string
   corsOrigin: string
   frontendUrl: string
+  sessaoRespostaTtlMinutos: number
 }
 
 function exigirVariavel(nome: string): string {
@@ -30,6 +31,15 @@ function variavelComPadrao(nome: string, padrao: string): string {
   return valor
 }
 
+// Igual a variavelComPadrao, mas faz parsing numérico com fallback seguro
+// para valor ausente/vazio/não numérico/<= 0.
+function numeroComPadrao(nome: string, padrao: number): number {
+  const bruto = process.env[nome]
+  if (!bruto || bruto.trim().length === 0) return padrao
+  const numero = Number(bruto)
+  return Number.isFinite(numero) && numero > 0 ? numero : padrao
+}
+
 // Fail fast: se alguma variável obrigatória faltar, o processo derruba no boot
 // em vez de subir um servidor "quebrado" (ver src/server.ts).
 export const env: Env = {
@@ -45,4 +55,8 @@ export const env: Env = {
   // redirectTo de e-mails do Supabase Auth) — mesmo tratamento de "opcional
   // com padrão seguro para dev local" do corsOrigin acima.
   frontendUrl: variavelComPadrao('FRONTEND_URL', 'http://localhost:5173'),
+  // TTL da sessão temporária emitida após confirmação de CPF no fluxo
+  // público `/responder` (ver coleta-respostas-publica.service.ts) — padrão
+  // de 45 minutos, dentro da faixa 30-60min pedida pela spec.
+  sessaoRespostaTtlMinutos: numeroComPadrao('SESSAO_RESPOSTA_TTL_MINUTOS', 45),
 }
