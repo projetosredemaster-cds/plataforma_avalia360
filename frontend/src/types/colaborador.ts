@@ -10,10 +10,11 @@ export interface Equipe {
 export interface Colaborador {
   id: string
   nomeCompleto: string
-  email: string
+  email: string | null
   cpf: string
   papel: Papel
   cargo: string | null
+  ehGestor: boolean
   ativo: boolean
   equipe: { id: string; nome: string } | null
   gestor: { id: string; nomeCompleto: string } | null

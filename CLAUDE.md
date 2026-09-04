@@ -12,10 +12,20 @@ Plataforma de Avaliação 360° — uma plataforma single-tenant de avaliação 
 - `backend/` — Node.js + Express + TypeORM + Postgres (Supabase). Já tem `src/` real
   (não é mais greenfield): módulos `auth`, `colaboradores`, `equipes`, `competencias`,
   `pesquisas`, `paginas-pesquisa`, `perguntas`, `ciclos-avaliacao` (entidades
-  `CicloAvaliacao`/`RelacionamentoAvaliacao`), `ciclo-participantes` e `envios-pesquisa`
-  implementados, com migrations, testes (Vitest) e scripts de build/dev configurados.
-  Módulos futuros (`respostas`, `itens_resposta`) ainda não existem — trate-os como
-  greenfield até serem implementados.
+  `CicloAvaliacao`/`RelacionamentoAvaliacao`), `ciclo-participantes`, `envios-pesquisa` e
+  `coleta-respostas-publica` implementados, com migrations, testes (Vitest) e scripts de
+  build/dev configurados. `coleta-respostas-publica` é a única rota pública da API
+  (`app.use('/api/publico', ...)`, montada em `app.ts` sem o middleware `autenticar`) —
+  fluxo de resposta a pesquisa via link + CPF, sem login, espelhado no frontend por
+  `ResponderPesquisaPage`. `respostas` e `respostas-clima` também já existem, mas só como
+  módulos de entidade (`resposta.entity.ts`/`item-resposta.entity.ts` e
+  `resposta-clima.entity.ts`/`item-resposta-clima.entity.ts`, sem `service`/`controller`/
+  `module.ts` próprios) — gravados diretamente pelo service de `coleta-respostas-publica`.
+  Só a ESCRITA (coleta) está implementada: `respostas`/`itens_resposta` (avaliação 360) são
+  sempre gravados identificados via `envio_id`; `respostas_clima`/`itens_resposta_clima`
+  são estruturalmente anônimos (sem nenhuma FK de identidade). Módulo futuro/greenfield de
+  verdade: leitura/agregação dessas respostas (inclusive a regra de anonimização de
+  pares/subordinado descrita abaixo) — nenhum endpoint disso existe ainda.
 
 Os agentes/skills do próprio repositório (`.claude/agents/*.md`, `.claude/skills/**/*.md`)
 se referem a estes diretórios como `apps/web` e `apps/api` — essa nomenclatura não existe
@@ -24,14 +34,15 @@ agente/skill com essa substituição em mente.
 
 `docs/schema_avaliacao360_pt_v2.sql` existe no repo — é a fonte de verdade para nomes de
 tabela/coluna dos módulos ainda não implementados. Para os módulos já implementados, as
-migrations existentes em `backend/src/migrations/` (6 arquivos, ver histórico de nomes
+migrations existentes em `backend/src/migrations/` (9 arquivos, ver histórico de nomes
 lá) são a fonte de verdade de fato. Nenhuma delas rodou contra um banco real ainda —
 confirme sempre com o usuário antes de decidir entre editar uma migration in-place ou
-gerar uma nova migration de correção em cima (a mais recente,
-`1788450000000-EnvioUnicoClimaGeralPorCiclo.ts`, seguiu o padrão de nova migration de
-correção em vez de editar `1788350000000`/`1788400000000` in-place, por já serem de
-tasks fechadas anteriormente — trate isso como o padrão a seguir: uma vez que uma
-migration corresponde a uma task já fechada, prefira uma nova migration de correção,
+gerar uma nova migration de correção em cima (as duas mais recentes,
+`1788550000000-AdicionarEhGestorColaboradores.ts` e
+`1788600000000-EmailColaboradorOpcional.ts`, seguiram o mesmo padrão de nova migration de
+correção em vez de editar `1788268503083-CriarEquipesEColaboradores.ts` in-place, por já
+ser de uma task fechada anteriormente — trate isso como o padrão a seguir: uma vez que
+uma migration corresponde a uma task já fechada, prefira uma nova migration de correção,
 mesmo que nenhuma tenha rodado ainda). Divergência conhecida e deliberada
 entre as duas: o módulo `perguntas` usa `enunciado` (sem `descricao`) e uma tabela
 relacional `perguntas_competencias` para o vínculo matriz↔competência, enquanto o doc de
@@ -145,6 +156,10 @@ src/modules/<nome>/
     criar-<nome>.dto.ts
     atualizar-<nome>.dto.ts
 ```
+  Exceção deliberada: `respostas` e `respostas-clima` são módulos só de entidade (sem
+  `service`/`controller`/`module.ts` próprios) — gravados diretamente pelo service de
+  `coleta-respostas-publica`, que é quem expõe a rota pública. Não force o padrão completo
+  de módulo nesses dois só por consistência.
 - `@Entity('<nome_tabela>')` e nomes de `@Column()` devem bater exatamente com os nomes
   em português de tabela/coluna do schema (ex.: `colaboradores`, `equipes`,
   `competencias`, `pesquisas`, `paginas_pesquisa`, `perguntas`,

@@ -21,7 +21,8 @@ import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog'
 import { TabelaEstado } from '../../components/TabelaEstado/TabelaEstado'
 import { ApiError } from '../../lib/apiClient'
 import { atualizarStatusColaborador, listarColaboradores } from '../../services/colaboradoresService'
-import type { Colaborador } from '../../types/colaborador'
+import { listarEquipes } from '../../services/equipesService'
+import type { Colaborador, Equipe } from '../../types/colaborador'
 
 type FiltroStatus = 'ativos' | 'inativos' | 'todos'
 
@@ -48,12 +49,16 @@ export function ColaboradoresListPage() {
   const location = useLocation()
 
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([])
+  const [equipes, setEquipes] = useState<Equipe[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
 
   const [buscaInput, setBuscaInput] = useState('')
   const [busca, setBusca] = useState('')
   const [statusFiltro, setStatusFiltro] = useState<FiltroStatus>('ativos')
+  const [equipeFiltro, setEquipeFiltro] = useState('')
+  const [somenteGestores, setSomenteGestores] = useState(false)
+  const [somenteAdmins, setSomenteAdmins] = useState(false)
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
 
@@ -89,8 +94,9 @@ export function ColaboradoresListPage() {
     setCarregando(true)
     setErro(null)
     try {
-      const dados = await listarColaboradores()
+      const [dados, listaEquipes] = await Promise.all([listarColaboradores(), listarEquipes()])
       setColaboradores(dados)
+      setEquipes(listaEquipes)
     } catch (err) {
       setErro(err instanceof ApiError ? err.message : 'Não foi possível carregar os colaboradores.')
     } finally {
@@ -110,19 +116,34 @@ export function ColaboradoresListPage() {
     return colaboradores.filter((colaborador) => {
       if (statusFiltro === 'ativos' && !colaborador.ativo) return false
       if (statusFiltro === 'inativos' && colaborador.ativo) return false
+      if (equipeFiltro && colaborador.equipe?.id !== equipeFiltro) return false
+      if (somenteGestores && !colaborador.ehGestor) return false
+      if (somenteAdmins && colaborador.papel !== 'admin' && colaborador.papel !== 'gestor_rh') return false
       if (!buscaNormalizada) return true
       return (
         colaborador.nomeCompleto.toLowerCase().includes(buscaNormalizada) ||
-        colaborador.email.toLowerCase().includes(buscaNormalizada)
+        (colaborador.email?.toLowerCase().includes(buscaNormalizada) ?? false)
       )
     })
-  }, [colaboradores, busca, statusFiltro])
+  }, [colaboradores, busca, statusFiltro, equipeFiltro, somenteGestores, somenteAdmins])
 
   // Reseta a paginação quando o filtro muda — ajuste de estado durante a
   // renderização (padrão documentado do React), em vez de um efeito.
-  const [filtrosAnteriores, setFiltrosAnteriores] = useState({ busca, statusFiltro })
-  if (filtrosAnteriores.busca !== busca || filtrosAnteriores.statusFiltro !== statusFiltro) {
-    setFiltrosAnteriores({ busca, statusFiltro })
+  const [filtrosAnteriores, setFiltrosAnteriores] = useState({
+    busca,
+    statusFiltro,
+    equipeFiltro,
+    somenteGestores,
+    somenteAdmins,
+  })
+  if (
+    filtrosAnteriores.busca !== busca ||
+    filtrosAnteriores.statusFiltro !== statusFiltro ||
+    filtrosAnteriores.equipeFiltro !== equipeFiltro ||
+    filtrosAnteriores.somenteGestores !== somenteGestores ||
+    filtrosAnteriores.somenteAdmins !== somenteAdmins
+  ) {
+    setFiltrosAnteriores({ busca, statusFiltro, equipeFiltro, somenteGestores, somenteAdmins })
     setPage(0)
   }
 
@@ -146,7 +167,12 @@ export function ColaboradoresListPage() {
     }
   }
 
-  const filtroAtivo = busca.trim().length > 0 || statusFiltro !== 'ativos'
+  const filtroAtivo =
+    busca.trim().length > 0 ||
+    statusFiltro !== 'ativos' ||
+    equipeFiltro !== '' ||
+    somenteGestores ||
+    somenteAdmins
 
   return (
     <div className="flex flex-col gap-4">
@@ -177,6 +203,51 @@ export function ColaboradoresListPage() {
           <MenuItem value="inativos">Inativos</MenuItem>
           <MenuItem value="todos">Todos</MenuItem>
         </TextField>
+        <TextField
+          select
+          label="Equipe"
+          value={equipeFiltro}
+          onChange={(e) => setEquipeFiltro(e.target.value)}
+          sx={{ minWidth: 180 }}
+        >
+          <MenuItem value="">Todas</MenuItem>
+          {equipes.map((equipe) => (
+            <MenuItem key={equipe.id} value={equipe.id}>
+              {equipe.nome}
+            </MenuItem>
+          ))}
+        </TextField>
+        <div className="flex items-center gap-2">
+          <Chip
+            label="Gestores"
+            clickable
+            variant={somenteGestores ? 'filled' : 'outlined'}
+            color={somenteGestores ? 'primary' : 'default'}
+            onClick={() => setSomenteGestores((atual) => !atual)}
+          />
+          <Chip
+            label="Administradores do sistema"
+            clickable
+            variant={somenteAdmins ? 'filled' : 'outlined'}
+            color={somenteAdmins ? 'primary' : 'default'}
+            onClick={() => setSomenteAdmins((atual) => !atual)}
+          />
+        </div>
+        {filtroAtivo && (
+          <Button
+            variant="text"
+            onClick={() => {
+              setBuscaInput('')
+              setBusca('')
+              setStatusFiltro('ativos')
+              setEquipeFiltro('')
+              setSomenteGestores(false)
+              setSomenteAdmins(false)
+            }}
+          >
+            Limpar
+          </Button>
+        )}
       </div>
 
       <Paper>
@@ -212,7 +283,7 @@ export function ColaboradoresListPage() {
                 listaPaginada.map((colaborador) => (
                   <TableRow key={colaborador.id} hover>
                     <TableCell>{colaborador.nomeCompleto}</TableCell>
-                    <TableCell>{colaborador.email}</TableCell>
+                    <TableCell>{colaborador.email ?? '—'}</TableCell>
                     <TableCell>{PAPEL_LABEL[colaborador.papel]}</TableCell>
                     <TableCell>{colaborador.cargo ?? '—'}</TableCell>
                     <TableCell>{colaborador.equipe?.nome ?? '—'}</TableCell>

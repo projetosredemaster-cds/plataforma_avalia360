@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
   Alert,
   Button,
+  Checkbox,
   CircularProgress,
+  FormControlLabel,
   MenuItem,
   Paper,
   TextField,
@@ -19,6 +21,7 @@ import {
 } from '../../services/colaboradoresService'
 import { listarEquipes } from '../../services/equipesService'
 import { cpfValido, formatarCpf, normalizarCpf } from '../../utils/cpf'
+import { CARGO_OPCOES } from '../../constants/colaborador'
 import type { Colaborador, Equipe, Papel } from '../../types/colaborador'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -50,8 +53,11 @@ export function ColaboradorFormPage() {
   const [cpf, setCpf] = useState('')
   const [papel, setPapel] = useState<Papel>('colaborador')
   const [cargo, setCargo] = useState('')
+  const [ehGestor, setEhGestor] = useState(false)
   const [equipeId, setEquipeId] = useState('')
   const [gestorId, setGestorId] = useState('')
+
+  const emailObrigatorio = papel === 'admin' || papel === 'gestor_rh'
 
   const [errosCampo, setErrosCampo] = useState<ErrosCampo>({})
   const [erroGeral, setErroGeral] = useState<string | null>(null)
@@ -61,21 +67,26 @@ export function ColaboradorFormPage() {
     setCarregandoInicial(true)
     setErroCarregamento(null)
     try {
-      const [listaEquipes, listaColaboradores, colaboradorAtual] = await Promise.all([
+      const [listaEquipes, listaGestores, colaboradorAtual] = await Promise.all([
         listarEquipes(),
-        listarColaboradores(),
+        listarColaboradores({ ehGestor: true, ativo: true }),
         isEdicao && id ? buscarColaborador(id) : Promise.resolve(null),
       ])
 
       setEquipes(listaEquipes)
-      setOpcoesGestor(listaColaboradores.filter((c) => c.ativo && c.id !== id))
+      // Filtro `ehGestor`/`ativo` já é feito pelo backend
+      // (`GET /api/colaboradores?ehGestor=true&ativo=true`); só o próprio
+      // colaborador em edição precisa ser excluído aqui, já que o backend
+      // não sabe qual formulário está fazendo a chamada.
+      setOpcoesGestor(listaGestores.filter((c) => c.id !== id))
 
       if (colaboradorAtual) {
         setNomeCompleto(colaboradorAtual.nomeCompleto)
-        setEmail(colaboradorAtual.email)
+        setEmail(colaboradorAtual.email ?? '')
         setCpf(formatarCpf(colaboradorAtual.cpf))
         setPapel(colaboradorAtual.papel)
         setCargo(colaboradorAtual.cargo ?? '')
+        setEhGestor(colaboradorAtual.ehGestor ?? false)
         setEquipeId(colaboradorAtual.equipe?.id ?? '')
         setGestorId(colaboradorAtual.gestor?.id ?? '')
       }
@@ -97,7 +108,10 @@ export function ColaboradorFormPage() {
     if (nomeCompleto.trim().length < 2) {
       erros.nomeCompleto = 'Informe o nome completo.'
     }
-    if (!EMAIL_REGEX.test(email.trim())) {
+    const emailPreenchido = email.trim().length > 0
+    if (emailObrigatorio && !emailPreenchido) {
+      erros.email = 'Informe o e-mail.'
+    } else if (emailPreenchido && !EMAIL_REGEX.test(email.trim())) {
       erros.email = 'Informe um e-mail válido.'
     }
     if (!cpfValido(cpf)) {
@@ -113,12 +127,17 @@ export function ColaboradorFormPage() {
     setErroGeral(null)
     if (!validar()) return
 
+    const emailTrimmed = email.trim()
     const payload: ColaboradorPayload = {
       nomeCompleto: nomeCompleto.trim(),
-      email: email.trim(),
+      // Papel `colaborador` pode não ter e-mail: enviamos `undefined` (campo
+      // omitido) em vez de string vazia, alinhado ao DTO do backend
+      // (`email?: string`) — ver task-backend.md, item 1.3.
+      email: emailTrimmed.length > 0 ? emailTrimmed : undefined,
       cpf: normalizarCpf(cpf),
       papel,
-      cargo: cargo.trim() || undefined,
+      cargo: cargo || undefined,
+      ehGestor,
       equipeId: equipeId || null,
       gestorId: gestorId || null,
     }
@@ -138,6 +157,15 @@ export function ColaboradorFormPage() {
             warningMessage:
               'Colaborador criado, mas não foi possível enviar o e-mail de definição de senha. ' +
               'Oriente a pessoa a usar "Esqueci minha senha" na tela de login.',
+          },
+        })
+        return
+      }
+      if (resposta.emailDefinicaoSenhaEnviado === true) {
+        navigate('/colaboradores', {
+          state: {
+            successMessage:
+              'Colaborador criado com sucesso. Um e-mail de definição de senha foi enviado para o endereço informado.',
           },
         })
         return
@@ -221,20 +249,7 @@ export function ColaboradorFormPage() {
           fullWidth
         />
 
-        {papel === 'colaborador' ? 
-        (
-          <TextField
-            label="E-mail"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={Boolean(errosCampo.email)}
-            helperText={errosCampo.email}
-            disabled={salvando}
-            fullWidth
-          />
-        ) : (
-          <TextField
+        <TextField
           label="E-mail"
           type="email"
           value={email}
@@ -242,11 +257,9 @@ export function ColaboradorFormPage() {
           error={Boolean(errosCampo.email)}
           helperText={errosCampo.email}
           disabled={salvando}
-          required
+          required={emailObrigatorio}
           fullWidth
         />
-        )}   
- 
         <TextField
           label="CPF"
           value={cpf}
@@ -260,11 +273,36 @@ export function ColaboradorFormPage() {
         />
 
         <TextField
+          select
           label="Cargo"
           value={cargo}
           onChange={(e) => setCargo(e.target.value)}
           disabled={salvando}
           fullWidth
+        >
+          <MenuItem value="">Nenhum</MenuItem>
+          {/* Valor legado digitado livremente antes desta task, que não bate
+              com nenhuma opção fixa: preserva o dado existente em vez de
+              apagá-lo silenciosamente ao abrir a edição. */}
+          {cargo && !(CARGO_OPCOES as readonly string[]).includes(cargo) && (
+            <MenuItem value={cargo}>{cargo} (valor atual)</MenuItem>
+          )}
+          {CARGO_OPCOES.map((opcao) => (
+            <MenuItem key={opcao} value={opcao}>
+              {opcao}
+            </MenuItem>
+          ))}
+        </TextField>
+
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={ehGestor}
+              onChange={(e) => setEhGestor(e.target.checked)}
+              disabled={salvando}
+            />
+          }
+          label="É gestor"
         />
 
         <TextField

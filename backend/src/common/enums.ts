@@ -85,3 +85,46 @@ export const STATUS_ENVIO_VALORES: StatusEnvio[] = [
 export type TipoPesquisa = 'avaliacao_360' | 'clima_geral'
 
 export const TIPO_PESQUISA_VALORES: TipoPesquisa[] = ['avaliacao_360', 'clima_geral']
+
+/**
+ * Lista fixa de cargos válidos para `colaboradores.cargo` — validada só em
+ * aplicação (a coluna continua `varchar` livre no banco, sem enum
+ * Postgres/migration). Adicionar uma opção nova é uma mudança de código
+ * (editar este array), nunca uma migration.
+ */
+export type CargoColaborador =
+  | 'Auxiliar de Escritório'
+  | 'Auxiliar Administrativo'
+  | 'Assistente Administrativo'
+  | 'Recepcionista'
+  | 'Atendente'
+  | 'Auxiliar Financeiro'
+  | 'Analista Financeiro'
+  | 'Contador'
+  | 'Assistente de RH'
+  | 'Analista de RH'
+  | 'Gerente de RH'
+  | 'Coordenador'
+  | 'Supervisor'
+  | 'Gerente'
+  | 'Diretor'
+  | 'Gestor'
+
+export const CARGO_COLABORADOR_VALORES: CargoColaborador[] = [
+  'Auxiliar de Escritório',
+  'Auxiliar Administrativo',
+  'Assistente Administrativo',
+  'Recepcionista',
+  'Atendente',
+  'Auxiliar Financeiro',
+  'Analista Financeiro',
+  'Contador',
+  'Assistente de RH',
+  'Analista de RH',
+  'Gerente de RH',
+  'Coordenador',
+  'Supervisor',
+  'Gerente',
+  'Diretor',
+  'Gestor',
+]

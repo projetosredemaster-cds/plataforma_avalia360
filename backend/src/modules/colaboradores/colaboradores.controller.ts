@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express'
-import { obterParametroRota } from '../../common/http-params'
+import { obterParametroRota, obterQueryBooleanoOpcional } from '../../common/http-params'
 import * as colaboradoresService from './colaboradores.service'
 
 export async function criarColaborador(req: Request, res: Response): Promise<void> {
@@ -8,7 +8,9 @@ export async function criarColaborador(req: Request, res: Response): Promise<voi
 }
 
 export async function listarColaboradores(req: Request, res: Response): Promise<void> {
-  const resposta = await colaboradoresService.listar(req.colaboradorAutenticado!)
+  const ehGestor = obterQueryBooleanoOpcional(req, 'ehGestor')
+  const ativo = obterQueryBooleanoOpcional(req, 'ativo')
+  const resposta = await colaboradoresService.listar(req.colaboradorAutenticado!, { ehGestor, ativo })
   res.status(200).json(resposta)
 }
 

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { Button, TextField, Typography } from '@mui/material'
+import { Button, IconButton, InputAdornment, TextField, Typography } from '@mui/material'
+import { Visibility, VisibilityOff } from '@mui/icons-material'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { EsqueciSenhaModal } from '../../components/EsqueciSenhaModal/EsqueciSenhaModal'
@@ -19,6 +20,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [mostrarSenha, setMostrarSenha] = useState(false)
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -83,12 +85,27 @@ export function LoginPage() {
             <TextField
               id="login-senha"
               label="Senha"
-              type="password"
+              type={mostrarSenha ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
               autoComplete="current-password"
               fullWidth
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                        onClick={() => setMostrarSenha((prev) => !prev)}
+                        edge="end"
+                      >
+                        {mostrarSenha ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                },
+              }}
             />
 
             {errorMsg && (

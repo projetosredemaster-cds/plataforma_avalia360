@@ -14,3 +14,16 @@ export function obterParametroRota(req: Request, nome: string): string {
   }
   return valor
 }
+
+/**
+ * Lê um filtro booleano opcional de query string (`req.query[nome]`).
+ * Ausente → undefined (sem filtro). Presente → precisa ser exatamente
+ * "true" ou "false", senão 400.
+ */
+export function obterQueryBooleanoOpcional(req: Request, nome: string): boolean | undefined {
+  const valor = req.query[nome]
+  if (valor === undefined) return undefined
+  if (valor === 'true') return true
+  if (valor === 'false') return false
+  throw new ErroHttp(400, 'PARAMETRO_INVALIDO', `Parâmetro de consulta "${nome}" deve ser "true" ou "false".`)
+}

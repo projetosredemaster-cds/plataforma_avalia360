@@ -18,8 +18,8 @@ export class Colaborador {
   @Column({ name: 'nome_completo', type: 'varchar', length: 255 })
   nomeCompleto!: string
 
-  @Column({ type: 'varchar', length: 255 })
-  email!: string
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  email!: string | null
 
   @Column({ type: 'char', length: 11 })
   cpf!: string
@@ -51,6 +51,9 @@ export class Colaborador {
 
   @Column({ type: 'boolean', default: true })
   ativo!: boolean
+
+  @Column({ name: 'eh_gestor', type: 'boolean', default: false })
+  ehGestor!: boolean
 
   @Column({ name: 'usuario_auth_id', type: 'uuid', nullable: true })
   usuarioAuthId!: string | null

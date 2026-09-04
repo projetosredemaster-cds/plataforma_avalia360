@@ -50,7 +50,12 @@ export async function autenticar(req: Request, _res: Response, next: NextFunctio
     id: colaborador.id,
     papel: colaborador.papel,
     nomeCompleto: colaborador.nomeCompleto,
-    email: colaborador.email,
+    // Só admin/gestor_rh têm usuario_auth_id preenchido (logo, só eles
+    // chegam até aqui) e ambos os papéis exigem email não nulo, reforçado em
+    // aplicação (colaboradores.service.ts, EMAIL_OBRIGATORIO_PARA_PAPEL) e
+    // em banco (CHECK chk_colaboradores_papel_email) — non-null assertion
+    // segura.
+    email: colaborador.email!,
   }
 
   next()

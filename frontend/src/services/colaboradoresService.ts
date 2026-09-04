@@ -9,10 +9,11 @@ import type { Colaborador, Papel } from '../types/colaborador'
  */
 export interface ColaboradorPayload {
   nomeCompleto: string
-  email: string
+  email?: string
   cpf: string
   papel: Papel
   cargo?: string
+  ehGestor: boolean
   equipeId?: string | null
   gestorId?: string | null
 }
@@ -21,8 +22,17 @@ export interface CriarColaboradorResposta extends Colaborador {
   emailDefinicaoSenhaEnviado: boolean | null
 }
 
-export function listarColaboradores(): Promise<Colaborador[]> {
-  return apiFetch<Colaborador[]>('/api/colaboradores')
+export interface ListarColaboradoresFiltros {
+  ehGestor?: boolean
+  ativo?: boolean
+}
+
+export function listarColaboradores(filtros?: ListarColaboradoresFiltros): Promise<Colaborador[]> {
+  const params = new URLSearchParams()
+  if (filtros?.ehGestor !== undefined) params.set('ehGestor', String(filtros.ehGestor))
+  if (filtros?.ativo !== undefined) params.set('ativo', String(filtros.ativo))
+  const query = params.toString()
+  return apiFetch<Colaborador[]>(`/api/colaboradores${query ? `?${query}` : ''}`)
 }
 
 export function buscarColaborador(id: string): Promise<Colaborador> {

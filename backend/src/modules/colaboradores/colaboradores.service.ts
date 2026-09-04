@@ -1,8 +1,14 @@
+import type { FindOptionsWhere } from 'typeorm'
 import { AppDataSource } from '../../data-source'
 import { env } from '../../config/env'
 import { garantirPapel } from '../../common/autorizacao'
 import { normalizarCpf, validarCpf } from '../../common/cpf'
-import { PAPEL_COLABORADOR_VALORES, type PapelColaborador } from '../../common/enums'
+import {
+  CARGO_COLABORADOR_VALORES,
+  PAPEL_COLABORADOR_VALORES,
+  type CargoColaborador,
+  type PapelColaborador,
+} from '../../common/enums'
 import { ErroHttp } from '../../common/erro-http'
 import { validarEmail, validarEnum, validarTextoObrigatorio } from '../../common/validacao'
 import { supabaseAdmin } from '../../lib/supabaseAdmin'
@@ -18,11 +24,12 @@ const PAPEIS_COM_ACESSO = ['admin', 'gestor_rh'] as const
 export interface ColaboradorResposta {
   id: string
   nomeCompleto: string
-  email: string
+  email: string | null
   cpf: string
   papel: PapelColaborador
   cargo: string | null
   ativo: boolean
+  ehGestor: boolean
   equipe: { id: string; nome: string } | null
   gestor: { id: string; nomeCompleto: string } | null
   usuarioAuthId: string | null
@@ -51,6 +58,7 @@ function mapearColaborador(colaborador: Colaborador): ColaboradorResposta {
     papel: colaborador.papel,
     cargo: colaborador.cargo,
     ativo: colaborador.ativo,
+    ehGestor: colaborador.ehGestor,
     equipe: colaborador.equipe ? { id: colaborador.equipe.id, nome: colaborador.equipe.nome } : null,
     gestor: colaborador.gestor
       ? { id: colaborador.gestor.id, nomeCompleto: colaborador.gestor.nomeCompleto }
@@ -149,10 +157,10 @@ async function removerContaAuthPorRebaixamento(usuarioAuthId: string): Promise<v
 
 interface CamposValidados {
   nomeCompleto: string
-  email: string
+  email: string | null
   papel: PapelColaborador
   cpfDigitos: string
-  cargo: string | null
+  cargo: CargoColaborador | null
 }
 
 function validarCamposObrigatorios(dto: CriarColaboradorDto): CamposValidados {
@@ -161,21 +169,33 @@ function validarCamposObrigatorios(dto: CriarColaboradorDto): CamposValidados {
     min: 2,
     max: 255,
   })
-  const email = validarEmail(dto.email, 'email')
   const papel = validarEnum(dto.papel, PAPEL_COLABORADOR_VALORES, 'papel')
+
+  let email: string | null = null
+  if (dto.email !== undefined && dto.email !== null && String(dto.email).trim().length > 0) {
+    email = validarEmail(dto.email, 'email')
+  }
+
+  if (deveTerContaAuth(papel) && email === null) {
+    throw new ErroHttp(
+      422,
+      'EMAIL_OBRIGATORIO_PARA_PAPEL',
+      'E-mail é obrigatório para os papéis admin e gestor_rh.',
+    )
+  }
 
   const cpfDigitos = normalizarCpf(dto.cpf)
   if (!validarCpf(cpfDigitos)) {
     throw new ErroHttp(422, 'CPF_INVALIDO', 'CPF inválido.')
   }
 
-  const cargo = dto.cargo !== undefined ? validarTextoObrigatorio(dto.cargo, { campo: 'cargo', min: 1, max: 255 }) : null
+  const cargo = dto.cargo !== undefined ? validarEnum(dto.cargo, CARGO_COLABORADOR_VALORES, 'cargo') : null
 
   return { nomeCompleto, email, papel, cpfDigitos, cargo }
 }
 
 async function garantirEmailECpfUnicos(
-  email: string,
+  email: string | null,
   cpfDigitos: string,
   idParaExcluir?: string,
 ): Promise<void> {
@@ -184,13 +204,18 @@ async function garantirEmailECpfUnicos(
     throw new ErroHttp(409, 'CPF_DUPLICADO', 'Já existe um colaborador com este CPF.')
   }
 
-  const existentePorEmail = await repositorio().findOneBy({ email })
-  if (existentePorEmail && existentePorEmail.id !== idParaExcluir) {
-    throw new ErroHttp(409, 'EMAIL_DUPLICADO', 'Já existe um colaborador com este e-mail.')
+  if (email !== null) {
+    const existentePorEmail = await repositorio().findOneBy({ email })
+    if (existentePorEmail && existentePorEmail.id !== idParaExcluir) {
+      throw new ErroHttp(409, 'EMAIL_DUPLICADO', 'Já existe um colaborador com este e-mail.')
+    }
   }
 }
 
-async function garantirEquipeExiste(equipeId: string): Promise<void> {
+async function garantirEquipeExiste(equipeId: string | null | undefined): Promise<void> {
+  if (!equipeId) {
+    return
+  }
   const equipe = await repositorioEquipe().findOneBy({ id: equipeId })
   if (!equipe) {
     throw new ErroHttp(404, 'EQUIPE_NAO_ENCONTRADA', 'Equipe não encontrada.')
@@ -198,9 +223,12 @@ async function garantirEquipeExiste(equipeId: string): Promise<void> {
 }
 
 async function garantirGestorValido(
-  gestorId: string,
+  gestorId: string | null | undefined,
   idProprioRegistro?: string,
 ): Promise<void> {
+  if (!gestorId) {
+    return
+  }
   if (idProprioRegistro && gestorId === idProprioRegistro) {
     throw new ErroHttp(422, 'GESTOR_INVALIDO', 'Um colaborador não pode ser gestor de si mesmo.')
   }
@@ -227,13 +255,19 @@ export async function criar(
     await garantirGestorValido(dto.gestorId)
   }
 
+  if (dto.ehGestor !== undefined && typeof dto.ehGestor !== 'boolean') {
+    throw new ErroHttp(422, 'CAMPO_INVALIDO', 'Campo "ehGestor" deve ser booleano.')
+  }
+
   const precisaContaAuth = deveTerContaAuth(papel)
 
   let usuarioAuthId: string | null = null
   let emailDefinicaoSenhaEnviado: boolean | null = null
 
   if (precisaContaAuth) {
-    usuarioAuthId = await criarContaAuth(email, nomeCompleto)
+    // `validarCamposObrigatorios` já garantiu email !== null para papéis
+    // que exigem conta Auth — non-null assertion segura aqui.
+    usuarioAuthId = await criarContaAuth(email!, nomeCompleto)
   }
 
   const novoColaborador = repositorio().create({
@@ -244,6 +278,7 @@ export async function criar(
     cargo,
     equipeId: dto.equipeId ?? null,
     gestorId: dto.gestorId ?? null,
+    ehGestor: dto.ehGestor ?? false,
     usuarioAuthId,
     ativo: true,
   })
@@ -259,7 +294,7 @@ export async function criar(
   }
 
   if (precisaContaAuth) {
-    emailDefinicaoSenhaEnviado = await enviarDefinicaoSenha(email)
+    emailDefinicaoSenhaEnviado = await enviarDefinicaoSenha(email!)
   }
 
   const completo = await repositorio().findOne({
@@ -270,10 +305,21 @@ export async function criar(
   return { ...mapearColaborador(completo!), emailDefinicaoSenhaEnviado }
 }
 
-export async function listar(ator: ColaboradorAutenticado): Promise<ColaboradorResposta[]> {
+export async function listar(
+  ator: ColaboradorAutenticado,
+  // `boolean | undefined` explícito (não só `?:`) porque `exactOptionalPropertyTypes`
+  // exige o tipo exato — o controller monta este objeto a partir de
+  // `obterQueryBooleanoOpcional`, que retorna `boolean | undefined`.
+  filtros?: { ehGestor?: boolean | undefined; ativo?: boolean | undefined },
+): Promise<ColaboradorResposta[]> {
   garantirPapel(ator, [...PAPEIS_COM_ACESSO])
 
+  const where: FindOptionsWhere<Colaborador> = {}
+  if (filtros?.ehGestor !== undefined) where.ehGestor = filtros.ehGestor
+  if (filtros?.ativo !== undefined) where.ativo = filtros.ativo
+
   const colaboradores = await repositorio().find({
+    where,
     relations: { equipe: true, gestor: true },
     order: { criadoEm: 'ASC' },
   })
@@ -319,9 +365,9 @@ export async function atualizar(
     })
   }
 
-  let emailNovo = colaborador.email
-  if (dto.email !== undefined) {
-    emailNovo = validarEmail(dto.email, 'email')
+  let emailNovo: string | null = colaborador.email
+  if ('email' in dto) {
+    emailNovo = dto.email === null ? null : validarEmail(dto.email, 'email')
   }
 
   let cpfDigitosNovo = colaborador.cpf
@@ -337,7 +383,14 @@ export async function atualizar(
   }
 
   if (dto.cargo !== undefined) {
-    colaborador.cargo = validarTextoObrigatorio(dto.cargo, { campo: 'cargo', min: 1, max: 255 })
+    colaborador.cargo = validarEnum(dto.cargo, CARGO_COLABORADOR_VALORES, 'cargo')
+  }
+
+  if (dto.ehGestor !== undefined) {
+    if (typeof dto.ehGestor !== 'boolean') {
+      throw new ErroHttp(422, 'CAMPO_INVALIDO', 'Campo "ehGestor" deve ser booleano.')
+    }
+    colaborador.ehGestor = dto.ehGestor
   }
 
   // Distingue "chave ausente" (não mexe) de "chave presente com null"
@@ -371,6 +424,14 @@ export async function atualizar(
   const papelAtual = colaborador.papel
   const papelNovo = dto.papel !== undefined ? validarEnum(dto.papel, PAPEL_COLABORADOR_VALORES, 'papel') : papelAtual
 
+  if (deveTerContaAuth(papelNovo) && emailNovo === null) {
+    throw new ErroHttp(
+      422,
+      'EMAIL_OBRIGATORIO_PARA_PAPEL',
+      'E-mail é obrigatório para os papéis admin e gestor_rh.',
+    )
+  }
+
   const contaAtualExiste = colaborador.usuarioAuthId !== null
   const contaNovaNecessaria = deveTerContaAuth(papelNovo)
 
@@ -379,7 +440,9 @@ export async function atualizar(
 
   // Promoção: colaborador (sem conta) -> admin/gestor_rh (passa a precisar de conta).
   if (!contaAtualExiste && contaNovaNecessaria) {
-    const novoUsuarioAuthId = await criarContaAuth(colaborador.email, colaborador.nomeCompleto)
+    // A checagem `deveTerContaAuth(papelNovo) && emailNovo === null` acima já
+    // garantiu email !== null neste ramo — non-null assertion segura.
+    const novoUsuarioAuthId = await criarContaAuth(colaborador.email!, colaborador.nomeCompleto)
     colaborador.papel = papelNovo
     colaborador.usuarioAuthId = novoUsuarioAuthId
 
@@ -390,7 +453,7 @@ export async function atualizar(
       await compensarContaAuthOrfa(novoUsuarioAuthId, erro)
       throw erro
     }
-    await enviarDefinicaoSenha(colaborador.email)
+    await enviarDefinicaoSenha(colaborador.email!)
 
     const completo = await repositorio().findOne({
       where: { id: salvo.id },

@@ -1,7 +1,20 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Button, CircularProgress, TextField, Typography } from '@mui/material'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import {
+  Button,
+  CircularProgress,
+  IconButton,
+  InputAdornment,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  TextField,
+  Typography,
+} from '@mui/material'
+import { Check, Close, Visibility, VisibilityOff } from '@mui/icons-material'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import { avaliarCriteriosSenha, senhaValida } from '../../utils/senha'
 
 type SessaoStatus = 'verificando' | 'valida' | 'invalida'
 
@@ -20,7 +33,11 @@ export function DefinirSenhaPage() {
   const [confirmarSenha, setConfirmarSenha] = useState('')
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [mostrarSenha, setMostrarSenha] = useState(false)
+  const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false)
   const resolvidoRef = useRef(false)
+
+  const criteriosSenha = useMemo(() => avaliarCriteriosSenha(senha), [senha])
 
   useEffect(() => {
     function marcarValida() {
@@ -68,8 +85,8 @@ export function DefinirSenhaPage() {
       setErrorMsg('Preencha os dois campos de senha.')
       return
     }
-    if (senha.length < 6) {
-      setErrorMsg('A senha deve ter no mínimo 6 caracteres.')
+    if (!senhaValida(senha) || !senhaValida(confirmarSenha)) {
+      setErrorMsg('A senha não atende a todos os critérios exigidos.')
       return
     }
     if (senha !== confirmarSenha) {
@@ -130,22 +147,81 @@ export function DefinirSenhaPage() {
           <TextField
             id="definir-senha-senha"
             label="Nova senha"
-            type="password"
+            type={mostrarSenha ? 'text' : 'password'}
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
             disabled={loading}
             autoComplete="new-password"
             fullWidth
+            slotProps={{
+              input: {
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                      onClick={() => setMostrarSenha((prev) => !prev)}
+                      edge="end"
+                    >
+                      {mostrarSenha ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
+            }}
           />
+
+          <List dense disablePadding aria-label="Critérios de senha" className="w-full">
+            {[
+              { atendido: criteriosSenha.tamanhoMinimo, texto: 'Mínimo de 6 caracteres' },
+              { atendido: criteriosSenha.maiuscula, texto: 'Pelo menos 1 letra maiúscula' },
+              { atendido: criteriosSenha.minuscula, texto: 'Pelo menos 1 letra minúscula' },
+              { atendido: criteriosSenha.caractereEspecial, texto: 'Pelo menos 1 caractere especial' },
+            ].map((criterio) => (
+              <ListItem key={criterio.texto} disableGutters disablePadding>
+                <ListItemIcon sx={{ minWidth: 32 }}>
+                  {criterio.atendido ? (
+                    <Check fontSize="small" color="success" />
+                  ) : (
+                    <Close fontSize="small" color="disabled" />
+                  )}
+                </ListItemIcon>
+                <ListItemText
+                  primary={criterio.texto}
+                  slotProps={{
+                    primary: {
+                      variant: 'body2',
+                      color: criterio.atendido ? 'success.main' : 'text.secondary',
+                    },
+                  }}
+                />
+              </ListItem>
+            ))}
+          </List>
+
           <TextField
             id="definir-senha-confirmar"
             label="Confirmar nova senha"
-            type="password"
+            type={mostrarConfirmarSenha ? 'text' : 'password'}
             value={confirmarSenha}
             onChange={(e) => setConfirmarSenha(e.target.value)}
             disabled={loading}
             autoComplete="new-password"
             fullWidth
+            slotProps={{
+              input: {
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label={mostrarConfirmarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                      onClick={() => setMostrarConfirmarSenha((prev) => !prev)}
+                      edge="end"
+                    >
+                      {mostrarConfirmarSenha ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
+            }}
           />
 
           {errorMsg && (

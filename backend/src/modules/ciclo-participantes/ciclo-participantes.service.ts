@@ -16,7 +16,7 @@ export interface ParticipanteResposta {
   id: string
   colaboradorId: string
   nomeCompleto: string
-  email: string
+  email: string | null
   cargo: string | null
   equipe: { id: string; nome: string } | null
 }

@@ -69,13 +69,18 @@ export function criarColaboradorFixture(parcial: Partial<Colaborador> = {}): Col
   } as Colaborador
 }
 
-/** Deriva o `ColaboradorAutenticado` (o que o middleware `autenticar` preencheria em req.colaboradorAutenticado). */
+/**
+ * Deriva o `ColaboradorAutenticado` (o que o middleware `autenticar`
+ * preencheria em req.colaboradorAutenticado) — só usado para atores
+ * admin/gestor_rh nos testes (os únicos que passam pelo middleware real),
+ * que sempre têm email não nulo; non-null assertion segura.
+ */
 export function atorDe(colaborador: Colaborador): ColaboradorAutenticado {
   return {
     id: colaborador.id,
     papel: colaborador.papel,
     nomeCompleto: colaborador.nomeCompleto,
-    email: colaborador.email,
+    email: colaborador.email!,
   }
 }
 
