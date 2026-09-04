@@ -1,5 +1,5 @@
 import { apiFetch } from '../lib/apiClient'
-import type { Ciclo, Relacionamento, StatusCiclo } from '../types/ciclo'
+import type { Ciclo, Relacionamento, StatusCiclo, TipoRelacionamentoGeravel } from '../types/ciclo'
 
 /** Corpo de `POST /api/ciclos`. */
 export interface CriarCicloPayload {
@@ -9,6 +9,12 @@ export interface CriarCicloPayload {
   dataFim: string // 'YYYY-MM-DD'
   anonimizarRespostasPares?: boolean
   minimoRespostasPares?: number
+  /**
+   * Opcional — se omitido, o backend usa o default de 4 tipos
+   * (`TIPO_RELACIONAMENTO_GERACAO_VALORES`). Rejeitado com `422
+   * CAMPO_INVALIDO` se enviado vazio ou com valor fora da allowlist.
+   */
+  tiposRelacionamentoGerados?: TipoRelacionamentoGeravel[]
 }
 
 /**

@@ -262,7 +262,12 @@ async function buscarSessaoValidaOuFalhar(sessaoToken: string): Promise<SessaoRe
  * Lê só `colaboradores`/`ciclo_participantes`/`relacionamentos_avaliacao`
  * (estrutural) — NUNCA `respostas`/`itens_resposta`, em nenhuma branch.
  */
-async function resolverOpcoesPessoa(
+// Exportada só para o script de diagnóstico standalone
+// (`scripts/verificar-resolver-opcoes-pessoa.ts`) importar e chamar
+// diretamente — nenhum outro consumidor de produto deve importar esta
+// função fora deste módulo (o fluxo público continua usando-a só
+// internamente via buscarFormulario/enviarRespostas).
+export async function resolverOpcoesPessoa(
   relacionamento: RelacionamentoAvaliacao,
   configuracao: Record<string, unknown>,
 ): Promise<OpcaoPessoaFormulario[]> {

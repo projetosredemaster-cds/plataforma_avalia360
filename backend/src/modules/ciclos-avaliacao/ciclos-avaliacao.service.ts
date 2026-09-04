@@ -1,9 +1,14 @@
 import { In, type EntityManager } from 'typeorm'
 import { AppDataSource } from '../../data-source'
 import { garantirPapel } from '../../common/autorizacao'
-import { STATUS_CICLO_VALORES, type StatusCiclo, type TipoRelacionamento } from '../../common/enums'
+import {
+  STATUS_CICLO_VALORES,
+  TIPO_RELACIONAMENTO_GERACAO_VALORES,
+  type StatusCiclo,
+  type TipoRelacionamento,
+} from '../../common/enums'
 import { ErroHttp } from '../../common/erro-http'
-import { validarEnum, validarTextoObrigatorio } from '../../common/validacao'
+import { validarEnum, validarListaEnum, validarTextoObrigatorio } from '../../common/validacao'
 import type { ColaboradorAutenticado } from '../../types/express'
 import { Colaborador } from '../colaboradores/colaborador.entity'
 import { CicloParticipante } from '../ciclo-participantes/ciclo-participante.entity'
@@ -35,6 +40,7 @@ export interface CicloResposta {
   status: StatusCiclo
   anonimizarRespostasPares: boolean
   minimoRespostasPares: number
+  tiposRelacionamentoGerados: TipoRelacionamento[]
   criadoPor: string | null
   criadoEm: string
   atualizadoEm: string
@@ -64,6 +70,7 @@ function mapearCiclo(ciclo: CicloAvaliacao): CicloResposta {
     status: ciclo.status,
     anonimizarRespostasPares: ciclo.anonimizarRespostasPares,
     minimoRespostasPares: ciclo.minimoRespostasPares,
+    tiposRelacionamentoGerados: ciclo.tiposRelacionamentoGerados,
     criadoPor: ciclo.criadoPor,
     criadoEm: ciclo.criadoEm.toISOString(),
     atualizadoEm: ciclo.atualizadoEm.toISOString(),
@@ -149,6 +156,15 @@ export async function criar(
   const minimoRespostasPares =
     dto.minimoRespostasPares !== undefined ? validarMinimoRespostasPares(dto.minimoRespostasPares) : 3
 
+  const tiposRelacionamentoGerados =
+    dto.tiposRelacionamentoGerados !== undefined
+      ? validarListaEnum(
+          dto.tiposRelacionamentoGerados,
+          TIPO_RELACIONAMENTO_GERACAO_VALORES,
+          'tiposRelacionamentoGerados',
+        )
+      : [...TIPO_RELACIONAMENTO_GERACAO_VALORES]
+
   const novo = repositorio().create({
     nome,
     descricao,
@@ -157,6 +173,7 @@ export async function criar(
     status: 'rascunho',
     anonimizarRespostasPares,
     minimoRespostasPares,
+    tiposRelacionamentoGerados,
     criadoPor: ator.id,
   })
 
@@ -229,6 +246,14 @@ export async function atualizar(
     ciclo.minimoRespostasPares = validarMinimoRespostasPares(dto.minimoRespostasPares)
   }
 
+  if (dto.tiposRelacionamentoGerados !== undefined) {
+    ciclo.tiposRelacionamentoGerados = validarListaEnum(
+      dto.tiposRelacionamentoGerados,
+      TIPO_RELACIONAMENTO_GERACAO_VALORES,
+      'tiposRelacionamentoGerados',
+    )
+  }
+
   const salvo = await repositorio().save(ciclo)
 
   return mapearCiclo(salvo)
@@ -249,13 +274,18 @@ export async function remover(ator: ColaboradorAutenticado, id: string): Promise
 }
 
 /**
- * Gera `relacionamentos_avaliacao` a partir dos participantes do ciclo.
- * Função interna — nunca exposta como rota própria, só usada por
- * `atualizarStatus` dentro da transação de ativação. Nunca gera
- * `tipo_relacionamento = 'externo'` (reservado para avaliador convidado
- * manualmente, fora do escopo deste motor).
+ * Gera `relacionamentos_avaliacao` a partir dos participantes do ciclo,
+ * respeitando `tiposHabilitados` (`ciclo.tiposRelacionamentoGerados`) — só
+ * insere linhas dos tipos presentes na lista. Função interna — nunca exposta
+ * como rota própria, só usada por `atualizarStatus` dentro da transação de
+ * ativação. Nunca gera `tipo_relacionamento = 'externo'` (reservado para
+ * avaliador convidado manualmente, fora do escopo deste motor).
  */
-async function gerarRelacionamentos(manager: EntityManager, cicloId: string): Promise<void> {
+async function gerarRelacionamentos(
+  manager: EntityManager,
+  cicloId: string,
+  tiposHabilitados: TipoRelacionamento[],
+): Promise<void> {
   const participantes = await manager.getRepository(CicloParticipante).find({ where: { cicloId } })
   const participanteIds = participantes.map((p) => p.colaboradorId)
 
@@ -287,23 +317,27 @@ async function gerarRelacionamentos(manager: EntityManager, cicloId: string): Pr
     []
 
   for (const p of colaboradores) {
-    // autoavaliacao: sempre.
-    linhas.push({ avaliadorId: p.id, avaliadoId: p.id, tipoRelacionamento: 'autoavaliacao' })
+    // autoavaliacao: sempre, se habilitada para este ciclo.
+    if (tiposHabilitados.includes('autoavaliacao')) {
+      linhas.push({ avaliadorId: p.id, avaliadoId: p.id, tipoRelacionamento: 'autoavaliacao' })
+    }
 
     // gestor: o gestor de p avalia p, MESMO que o gestor não seja participante
     // (gestorId, se preenchido, sempre existe em `colaboradores` — FK garante).
-    if (p.gestorId) {
+    if (tiposHabilitados.includes('gestor') && p.gestorId) {
       linhas.push({ avaliadorId: p.gestorId, avaliadoId: p.id, tipoRelacionamento: 'gestor' })
     }
 
     // subordinado: participantes cujo gestorId === p.id avaliam p.
-    for (const subordinado of participantesPorGestor.get(p.id) ?? []) {
-      linhas.push({ avaliadorId: subordinado.id, avaliadoId: p.id, tipoRelacionamento: 'subordinado' })
+    if (tiposHabilitados.includes('subordinado')) {
+      for (const subordinado of participantesPorGestor.get(p.id) ?? []) {
+        linhas.push({ avaliadorId: subordinado.id, avaliadoId: p.id, tipoRelacionamento: 'subordinado' })
+      }
     }
 
     // pares: participantes com o MESMO equipeId de p (excluindo p) avaliam p.
     // Participante sem equipeId simplesmente não entra aqui (skip silencioso).
-    if (p.equipeId) {
+    if (tiposHabilitados.includes('pares') && p.equipeId) {
       for (const par of participantesPorEquipe.get(p.equipeId) ?? []) {
         if (par.id !== p.id) {
           linhas.push({ avaliadorId: par.id, avaliadoId: p.id, tipoRelacionamento: 'pares' })
@@ -368,9 +402,20 @@ export async function atualizarStatus(
       )
     }
 
+    // Só se aplica a avaliacao_360 — clima_geral nunca gera
+    // relacionamentos_avaliacao, então este campo é irrelevante para ele
+    // (guard rail de anonimização inalterado, ver seção 1.11 da task).
+    if (pesquisaPublicada.tipo === 'avaliacao_360' && ciclo.tiposRelacionamentoGerados.length === 0) {
+      throw new ErroHttp(
+        422,
+        'CICLO_SEM_TIPO_RELACIONAMENTO',
+        'O ciclo precisa de pelo menos um tipo de relacionamento selecionado para ser ativado.',
+      )
+    }
+
     const salvo = await AppDataSource.transaction(async (manager) => {
       if (pesquisaPublicada.tipo === 'avaliacao_360') {
-        await gerarRelacionamentos(manager, ciclo.id)
+        await gerarRelacionamentos(manager, ciclo.id, ciclo.tiposRelacionamentoGerados)
         await gerarEnviosPesquisa(manager, ciclo.id, pesquisaPublicada.id)
       } else {
         // clima_geral: NUNCA gera relacionamentos_avaliacao — guard rail de

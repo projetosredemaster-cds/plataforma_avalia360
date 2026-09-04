@@ -55,6 +55,22 @@ export const TIPO_RELACIONAMENTO_VALORES: TipoRelacionamento[] = [
 ]
 
 /**
+ * Subconjunto de `TipoRelacionamento` selecionável em
+ * `ciclos_avaliacao.tipos_relacionamento_gerados` — os únicos tipos que o
+ * motor de ciclos (`gerarRelacionamentos`) sabe gerar automaticamente.
+ * Exclui `'externo'` (reservado para avaliador convidado manualmente, nunca
+ * gerado por este motor). Não confundir com
+ * `TIPO_RELACIONAMENTO_FILTRO_PESSOA_VALORES` (propósito diferente: filtro
+ * de pergunta tipo `pessoa`).
+ */
+export const TIPO_RELACIONAMENTO_GERACAO_VALORES: TipoRelacionamento[] = [
+  'autoavaliacao',
+  'gestor',
+  'pares',
+  'subordinado',
+]
+
+/**
  * Allowlist de `configuracao.filtroRelacionamento` (pergunta tipo `pessoa`).
  * Estende `TipoRelacionamento` com `'todos_gestores'`, que NÃO é um tipo de
  * relacionamento real — não existe nem existirá linha em

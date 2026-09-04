@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { Alert, Button, Paper, Switch, TextField, Typography, FormControlLabel } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
+import { TiposRelacionamentoCheckboxGroup } from '../../components/ciclos/TiposRelacionamentoCheckboxGroup/TiposRelacionamentoCheckboxGroup'
 import { ApiError } from '../../lib/apiClient'
 import { criarCiclo } from '../../services/ciclosService'
+import type { TipoRelacionamentoGeravel } from '../../types/ciclo'
 
 interface ErrosCampo {
   nome?: string
@@ -10,6 +12,7 @@ interface ErrosCampo {
   dataInicio?: string
   dataFim?: string
   minimoRespostasPares?: string
+  tiposRelacionamentoGerados?: string
 }
 
 export function CicloFormPage() {
@@ -21,6 +24,12 @@ export function CicloFormPage() {
   const [dataFim, setDataFim] = useState('')
   const [minimoRespostasPares, setMinimoRespostasPares] = useState('3')
   const [anonimizarRespostasPares, setAnonimizarRespostasPares] = useState(true)
+  const [tiposRelacionamentoGerados, setTiposRelacionamentoGerados] = useState<TipoRelacionamentoGeravel[]>([
+    'autoavaliacao',
+    'gestor',
+    'pares',
+    'subordinado',
+  ])
 
   const [errosCampo, setErrosCampo] = useState<ErrosCampo>({})
   const [erroGeral, setErroGeral] = useState<string | null>(null)
@@ -48,6 +57,9 @@ export function CicloFormPage() {
     if (!Number.isInteger(minimoNumero) || minimoNumero < 1) {
       erros.minimoRespostasPares = 'Informe um número inteiro maior ou igual a 1.'
     }
+    if (tiposRelacionamentoGerados.length === 0) {
+      erros.tiposRelacionamentoGerados = 'Selecione ao menos um tipo de relação.'
+    }
     setErrosCampo(erros)
     return Object.keys(erros).length === 0
   }
@@ -67,6 +79,7 @@ export function CicloFormPage() {
         dataFim,
         anonimizarRespostasPares,
         minimoRespostasPares: Number(minimoRespostasPares),
+        tiposRelacionamentoGerados,
       })
       navigate(`/ciclos/${novo.id}`, { replace: true })
     } catch (err) {
@@ -155,6 +168,14 @@ export function CicloFormPage() {
             />
           }
           label="Esconde quem respondeu quando a avaliação vem de um colega ou de um liderado avaliando o gestor."
+        />
+
+        <TiposRelacionamentoCheckboxGroup
+          value={tiposRelacionamentoGerados}
+          onChange={setTiposRelacionamentoGerados}
+          disabled={salvando}
+          error={Boolean(errosCampo.tiposRelacionamentoGerados)}
+          helperText={errosCampo.tiposRelacionamentoGerados}
         />
 
         {erroGeral && (

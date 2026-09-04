@@ -2,6 +2,14 @@ export type StatusCiclo = 'rascunho' | 'ativo' | 'encerrado'
 
 export type TipoRelacionamento = 'autoavaliacao' | 'gestor' | 'pares' | 'subordinado' | 'externo'
 
+/**
+ * Subconjunto de `TipoRelacionamento` que o motor de ciclos pode gerar
+ * automaticamente na ativação — nunca inclui `'externo'` (o motor não gera
+ * esse tipo automaticamente, confirmado pelo `task-backend.md`:
+ * `TIPO_RELACIONAMENTO_GERACAO_VALORES`).
+ */
+export type TipoRelacionamentoGeravel = 'autoavaliacao' | 'gestor' | 'pares' | 'subordinado'
+
 export interface Ciclo {
   id: string
   nome: string
@@ -11,6 +19,13 @@ export interface Ciclo {
   status: StatusCiclo
   anonimizarRespostasPares: boolean
   minimoRespostasPares: number
+  /**
+   * Configura quais tipos de relação o motor de ciclos gera na ativação
+   * (cada um ligado/desligado independentemente). Editável só com
+   * `status === 'rascunho'` (mesma trava de `PUT /api/ciclos/:id` que já
+   * vale para os outros campos editáveis do ciclo).
+   */
+  tiposRelacionamentoGerados: TipoRelacionamentoGeravel[]
   criadoPor: string | null
   criadoEm: string
   atualizadoEm: string

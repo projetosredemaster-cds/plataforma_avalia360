@@ -66,3 +66,33 @@ export function validarEnum<T extends string>(
   }
   return valor as T
 }
+
+/**
+ * Valida que `valor` é um array não vazio, com todos os elementos presentes
+ * em `valoresValidos`. Retorna a lista deduplicada (preservando a ordem da
+ * primeira ocorrência) — nunca `[]`.
+ */
+export function validarListaEnum<T extends string>(
+  valor: unknown,
+  valoresValidos: readonly T[],
+  campo: string,
+): T[] {
+  if (!Array.isArray(valor) || valor.length === 0) {
+    throw new ErroHttp(
+      422,
+      'CAMPO_INVALIDO',
+      `Campo "${campo}" deve ser uma lista não vazia de valores entre: ${valoresValidos.join(', ')}.`,
+    )
+  }
+
+  const invalidos = valor.filter((v) => typeof v !== 'string' || !valoresValidos.includes(v as T))
+  if (invalidos.length > 0) {
+    throw new ErroHttp(
+      422,
+      'CAMPO_INVALIDO',
+      `Campo "${campo}" contém valores inválidos: ${invalidos.join(', ')}. Valores aceitos: ${valoresValidos.join(', ')}.`,
+    )
+  }
+
+  return Array.from(new Set(valor as T[]))
+}

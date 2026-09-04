@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Alert, Button, Card, CardContent, FormControlLabel, Switch, TextField, Typography } from '@mui/material'
+import { TiposRelacionamentoCheckboxGroup } from '../../components/ciclos/TiposRelacionamentoCheckboxGroup/TiposRelacionamentoCheckboxGroup'
 import { ApiError } from '../../lib/apiClient'
 import { atualizarCiclo } from '../../services/ciclosService'
-import type { Ciclo } from '../../types/ciclo'
+import type { Ciclo, TipoRelacionamentoGeravel } from '../../types/ciclo'
+import type { TipoPesquisa } from '../../types/pesquisa'
 
 interface ErrosCampo {
   nome?: string
@@ -10,11 +12,13 @@ interface ErrosCampo {
   dataInicio?: string
   dataFim?: string
   minimoRespostasPares?: string
+  tiposRelacionamentoGerados?: string
 }
 
 interface CicloDadosFormProps {
   ciclo: Ciclo
   onAtualizado: (ciclo: Ciclo) => void
+  tipoPesquisa: TipoPesquisa | null
 }
 
 /**
@@ -26,7 +30,7 @@ interface CicloDadosFormProps {
  * diferente da trava equivalente em `PesquisaConstrutorPage`, esta não
  * precisa ser documentada como "só client-side".
  */
-export function CicloDadosForm({ ciclo, onAtualizado }: CicloDadosFormProps) {
+export function CicloDadosForm({ ciclo, onAtualizado, tipoPesquisa }: CicloDadosFormProps) {
   const somenteLeitura = ciclo.status !== 'rascunho'
 
   const [nome, setNome] = useState(ciclo.nome)
@@ -35,6 +39,9 @@ export function CicloDadosForm({ ciclo, onAtualizado }: CicloDadosFormProps) {
   const [dataFim, setDataFim] = useState(ciclo.dataFim)
   const [minimoRespostasPares, setMinimoRespostasPares] = useState(String(ciclo.minimoRespostasPares))
   const [anonimizarRespostasPares, setAnonimizarRespostasPares] = useState(ciclo.anonimizarRespostasPares)
+  const [tiposRelacionamentoGerados, setTiposRelacionamentoGerados] = useState<TipoRelacionamentoGeravel[]>(
+    ciclo.tiposRelacionamentoGerados,
+  )
 
   const [errosCampo, setErrosCampo] = useState<ErrosCampo>({})
   const [erroGeral, setErroGeral] = useState<string | null>(null)
@@ -62,6 +69,9 @@ export function CicloDadosForm({ ciclo, onAtualizado }: CicloDadosFormProps) {
     if (!Number.isInteger(minimoNumero) || minimoNumero < 1) {
       erros.minimoRespostasPares = 'Informe um número inteiro maior ou igual a 1.'
     }
+    if (tipoPesquisa !== 'clima_geral' && tiposRelacionamentoGerados.length === 0) {
+      erros.tiposRelacionamentoGerados = 'Selecione ao menos um tipo de relação.'
+    }
     setErrosCampo(erros)
     return Object.keys(erros).length === 0
   }
@@ -78,6 +88,7 @@ export function CicloDadosForm({ ciclo, onAtualizado }: CicloDadosFormProps) {
         dataFim,
         anonimizarRespostasPares,
         minimoRespostasPares: Number(minimoRespostasPares),
+        tiposRelacionamentoGerados,
       })
       onAtualizado(atualizado)
     } catch (err) {
@@ -169,6 +180,16 @@ export function CicloDadosForm({ ciclo, onAtualizado }: CicloDadosFormProps) {
           }
           label="Anonimizar respostas de pares/subordinado (política de exposição de respostas do ciclo, aplicada pelo backend)"
         />
+
+        {tipoPesquisa !== 'clima_geral' && (
+          <TiposRelacionamentoCheckboxGroup
+            value={tiposRelacionamentoGerados}
+            onChange={setTiposRelacionamentoGerados}
+            disabled={somenteLeitura || salvando}
+            error={Boolean(errosCampo.tiposRelacionamentoGerados)}
+            helperText={errosCampo.tiposRelacionamentoGerados}
+          />
+        )}
 
         {erroGeral && (
           <Alert severity="error" role="alert">

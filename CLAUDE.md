@@ -34,13 +34,13 @@ agente/skill com essa substituição em mente.
 
 `docs/schema_avaliacao360_pt_v2.sql` existe no repo — é a fonte de verdade para nomes de
 tabela/coluna dos módulos ainda não implementados. Para os módulos já implementados, as
-migrations existentes em `backend/src/migrations/` (9 arquivos, ver histórico de nomes
+migrations existentes em `backend/src/migrations/` (10 arquivos, ver histórico de nomes
 lá) são a fonte de verdade de fato. Nenhuma delas rodou contra um banco real ainda —
 confirme sempre com o usuário antes de decidir entre editar uma migration in-place ou
-gerar uma nova migration de correção em cima (as duas mais recentes,
-`1788550000000-AdicionarEhGestorColaboradores.ts` e
-`1788600000000-EmailColaboradorOpcional.ts`, seguiram o mesmo padrão de nova migration de
-correção em vez de editar `1788268503083-CriarEquipesEColaboradores.ts` in-place, por já
+gerar uma nova migration de correção em cima (a mais recente,
+`1788650000000-TiposRelacionamentoGeradosPorCiclo.ts`, seguiu o mesmo padrão de nova
+migration de correção em vez de editar
+`1788300000000-CriarCiclosAvaliacaoRelacionamentosEParticipantes.ts` in-place, por já
 ser de uma task fechada anteriormente — trate isso como o padrão a seguir: uma vez que
 uma migration corresponde a uma task já fechada, prefira uma nova migration de correção,
 mesmo que nenhuma tenha rodado ainda). Divergência conhecida e deliberada
@@ -49,6 +49,14 @@ relacional `perguntas_competencias` para o vínculo matriz↔competência, enqua
 schema descreve `titulo`+`descricao` e vínculo via jsonb — já implementado ponta a ponta
 (service, DTOs, 15 arquivos do frontend); não alterar isso sem confirmação explícita do
 usuário.
+
+`backend/scripts/` existe para scripts pontuais de diagnóstico/verificação (não é suite
+de teste formal, não roda em CI, não faz parte do build) — ex.:
+`verificar-resolver-opcoes-pessoa.ts`, que semeia dados prefixados `ZTeste_` via funções
+de service reais e compara o resultado de uma função contra um gabarito calculado à mão,
+imprimindo (sem executar) o SQL de limpeza ao final. Mesma regra de nunca rodar contra um
+banco real sem confirmação explícita se aplica a qualquer script desse diretório que grave
+dado.
 
 ## Comandos
 

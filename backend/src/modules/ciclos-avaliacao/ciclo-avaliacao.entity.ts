@@ -5,7 +5,11 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm'
-import { STATUS_CICLO_VALORES, type StatusCiclo } from '../../common/enums'
+import {
+  STATUS_CICLO_VALORES,
+  type StatusCiclo,
+  type TipoRelacionamento,
+} from '../../common/enums'
 
 @Entity('ciclos_avaliacao')
 export class CicloAvaliacao {
@@ -40,6 +44,21 @@ export class CicloAvaliacao {
 
   @Column({ name: 'minimo_respostas_pares', type: 'smallint', default: 3 })
   minimoRespostasPares!: number
+
+  // Subconjunto de TIPO_RELACIONAMENTO_GERACAO_VALORES habilitado para este
+  // ciclo — `gerarRelacionamentos` (ciclos-avaliacao.service.ts) só insere
+  // linhas de relacionamentos_avaliacao dos tipos presentes aqui. `default`
+  // é só metadado de schema do TypeORM (não aplicado por `.create({...})`
+  // quando o campo é omitido) — o valor real default é setado
+  // explicitamente pelo service (criar()) e reforçado pelo DEFAULT da coluna
+  // no banco (migration 1788650000000).
+  @Column({
+    name: 'tipos_relacionamento_gerados',
+    type: 'text',
+    array: true,
+    default: "'{autoavaliacao,gestor,pares,subordinado}'",
+  })
+  tiposRelacionamentoGerados!: TipoRelacionamento[]
 
   @Column({ name: 'criado_por', type: 'uuid', nullable: true })
   criadoPor!: string | null

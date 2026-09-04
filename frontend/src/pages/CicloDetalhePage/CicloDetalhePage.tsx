@@ -535,7 +535,7 @@ export function CicloDetalhePage() {
         </div>
       </div>
 
-      <CicloDadosForm ciclo={ciclo} onAtualizado={setCiclo} />
+      <CicloDadosForm ciclo={ciclo} onAtualizado={setCiclo} tipoPesquisa={tipoPesquisaCiclo} />
 
       <Card>
         <CardContent className="flex flex-col gap-4">

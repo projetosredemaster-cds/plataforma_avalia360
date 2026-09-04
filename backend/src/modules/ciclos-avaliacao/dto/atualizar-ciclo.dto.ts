@@ -7,4 +7,6 @@ export interface AtualizarCicloDto {
   dataFim?: string
   anonimizarRespostasPares?: boolean
   minimoRespostasPares?: number
+  // Se omitido, mantém o valor atual do ciclo (nunca reseta para o default).
+  tiposRelacionamentoGerados?: string[]
 }
