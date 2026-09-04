@@ -3,6 +3,7 @@ export type Papel = 'admin' | 'gestor_rh' | 'colaborador'
 export interface Equipe {
   id: string
   nome: string
+  totalColaboradores: number
   criadoEm?: string
   atualizadoEm?: string
 }

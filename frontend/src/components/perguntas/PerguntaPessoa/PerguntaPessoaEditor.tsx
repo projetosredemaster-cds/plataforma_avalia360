@@ -1,4 +1,13 @@
-import { FormControlLabel, MenuItem, Select, Switch, TextField, type SelectChangeEvent } from '@mui/material'
+import {
+  FormControl,
+  FormControlLabel,
+  FormHelperText,
+  MenuItem,
+  Select,
+  Switch,
+  TextField,
+  type SelectChangeEvent,
+} from '@mui/material'
 import type { ConfiguracaoPessoa } from '../../../types/pesquisa'
 
 export interface PerguntaPessoaValor {
@@ -15,11 +24,10 @@ interface PerguntaPessoaEditorProps {
 
 /** Confirmado pelo contrato real do backend (camelCase, não `filtro_relacionamento`). */
 const RELACIONAMENTO_OPCOES: { valor: string; label: string }[] = [
-  { valor: 'autoavaliacao', label: 'Autoavaliação' },
-  { valor: 'gestor', label: 'Gestor' },
   { valor: 'pares', label: 'Pares' },
   { valor: 'subordinado', label: 'Subordinado' },
   { valor: 'externo', label: 'Externo' },
+  { valor: 'todos_gestores', label: 'Todos os gestores' },
 ]
 
 export function PerguntaPessoaEditor({ valor, onChange, somenteLeitura = false }: PerguntaPessoaEditorProps) {
@@ -50,24 +58,31 @@ export function PerguntaPessoaEditor({ valor, onChange, somenteLeitura = false }
         }
         label="Obrigatória"
       />
-      <Select
-        multiple
-        displayEmpty
-        value={valor.configuracao.filtroRelacionamento}
-        onChange={handleFiltroChange}
-        disabled={somenteLeitura}
-        renderValue={(selecionados) =>
-          selecionados.length === 0
-            ? 'Selecione ao menos 1 relacionamento'
-            : selecionados.map((v) => RELACIONAMENTO_OPCOES.find((o) => o.valor === v)?.label ?? v).join(', ')
-        }
-      >
-        {RELACIONAMENTO_OPCOES.map((opcao) => (
-          <MenuItem key={opcao.valor} value={opcao.valor}>
-            {opcao.label}
-          </MenuItem>
-        ))}
-      </Select>
+      <FormControl disabled={somenteLeitura}>
+        <Select
+          multiple
+          displayEmpty
+          value={valor.configuracao.filtroRelacionamento}
+          onChange={handleFiltroChange}
+          disabled={somenteLeitura}
+          renderValue={(selecionados) =>
+            selecionados.length === 0
+              ? 'Selecione ao menos 1 relacionamento'
+              : selecionados.map((v) => RELACIONAMENTO_OPCOES.find((o) => o.valor === v)?.label ?? v).join(', ')
+          }
+        >
+          {RELACIONAMENTO_OPCOES.map((opcao) => (
+            <MenuItem key={opcao.valor} value={opcao.valor}>
+              {opcao.label}
+            </MenuItem>
+          ))}
+        </Select>
+        <FormHelperText>
+          Pares, Subordinado e Externo dependem da relação do respondente com o avaliado no ciclo. Todos os
+          gestores independe dessa relação: lista todos os colaboradores marcados como gestor que participam do
+          ciclo.
+        </FormHelperText>
+      </FormControl>
     </div>
   )
 }

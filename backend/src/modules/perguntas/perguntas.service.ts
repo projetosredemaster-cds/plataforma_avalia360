@@ -3,7 +3,7 @@ import { AppDataSource } from '../../data-source'
 import { garantirPapel } from '../../common/autorizacao'
 import {
   TIPO_PERGUNTA_VALORES,
-  TIPO_RELACIONAMENTO_VALORES,
+  TIPO_RELACIONAMENTO_FILTRO_PESSOA_VALORES,
   type TipoPergunta,
 } from '../../common/enums'
 import { ErroHttp } from '../../common/erro-http'
@@ -132,7 +132,8 @@ function validarConfiguracaoPergunta(
     !Array.isArray(filtroRelacionamento) ||
     filtroRelacionamento.length === 0 ||
     filtroRelacionamento.some(
-      (item) => typeof item !== 'string' || !TIPO_RELACIONAMENTO_VALORES.includes(item as never),
+      (item) =>
+        typeof item !== 'string' || !TIPO_RELACIONAMENTO_FILTRO_PESSOA_VALORES.includes(item as never),
     )
   ) {
     throw new ErroHttp(

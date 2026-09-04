@@ -265,13 +265,22 @@ async function gerarRelacionamentos(manager: EntityManager, cicloId: string): Pr
     where: { id: In(participanteIds) },
   })
 
-  // Participantes agrupados por gestorId — usado para "subordinado" e "pares".
+  // Participantes agrupados por gestorId — usado para "subordinado".
   const participantesPorGestor = new Map<string, Colaborador[]>()
   for (const c of colaboradores) {
     if (!c.gestorId) continue
     const lista = participantesPorGestor.get(c.gestorId) ?? []
     lista.push(c)
     participantesPorGestor.set(c.gestorId, lista)
+  }
+
+  // Participantes agrupados por equipeId — usado para "pares".
+  const participantesPorEquipe = new Map<string, Colaborador[]>()
+  for (const c of colaboradores) {
+    if (!c.equipeId) continue
+    const lista = participantesPorEquipe.get(c.equipeId) ?? []
+    lista.push(c)
+    participantesPorEquipe.set(c.equipeId, lista)
   }
 
   const linhas: { avaliadorId: string; avaliadoId: string; tipoRelacionamento: TipoRelacionamento }[] =
@@ -292,10 +301,10 @@ async function gerarRelacionamentos(manager: EntityManager, cicloId: string): Pr
       linhas.push({ avaliadorId: subordinado.id, avaliadoId: p.id, tipoRelacionamento: 'subordinado' })
     }
 
-    // pares: participantes com o MESMO gestorId de p (excluindo p) avaliam p.
-    // Participante sem gestorId simplesmente não entra aqui (skip silencioso).
-    if (p.gestorId) {
-      for (const par of participantesPorGestor.get(p.gestorId) ?? []) {
+    // pares: participantes com o MESMO equipeId de p (excluindo p) avaliam p.
+    // Participante sem equipeId simplesmente não entra aqui (skip silencioso).
+    if (p.equipeId) {
+      for (const par of participantesPorEquipe.get(p.equipeId) ?? []) {
         if (par.id !== p.id) {
           linhas.push({ avaliadorId: par.id, avaliadoId: p.id, tipoRelacionamento: 'pares' })
         }

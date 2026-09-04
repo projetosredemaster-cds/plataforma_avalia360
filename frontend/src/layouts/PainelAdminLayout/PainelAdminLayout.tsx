@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   AppBar,
   Box,
@@ -10,6 +10,10 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  MenuItem as MuiMenuItem,
+  MenuList,
+  Paper,
+  Popper,
   Toolbar,
   Typography,
 } from '@mui/material'
@@ -19,6 +23,7 @@ import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
 import WorkOutlineIcon from '@mui/icons-material/WorkOutlineOutlined'
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 import AutorenewOutlinedIcon from '@mui/icons-material/AutorenewOutlined'
+import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined'
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
@@ -27,24 +32,33 @@ import { useAuth } from '../../context/AuthContext'
 
 const SIDEBAR_WIDTH = 240
 
-type MenuItem = {
+type MenuLink = {
   to: string
   label: string
   icon: React.ReactNode
 }
 
-type MenuGroup = {
+type SubmenuOpcao = {
+  label: string
+  disabled?: boolean
+}
+
+type Submenu = {
   key: string
   label: string
-  icon: React.ReactNode
-  items: MenuItem[]
+  opcoes: SubmenuOpcao[]
 }
+
+type MenuGroup =
+  | { key: string; label: string; icon: React.ReactNode; tipo: 'links'; items: MenuLink[] }
+  | { key: string; label: string; icon: React.ReactNode; tipo: 'submenus'; submenus: Submenu[] }
 
 const GRUPOS: MenuGroup[] = [
   {
     key: 'cadastro',
     label: 'Cadastro',
     icon: <BadgeOutlinedIcon fontSize="small" />,
+    tipo: 'links',
     items: [
       { to: '/colaboradores', label: 'Colaboradores', icon: <PersonOutlineIcon fontSize="small" /> },
       { to: '/equipes', label: 'Equipes', icon: <GroupsOutlinedIcon fontSize="small" /> },
@@ -54,15 +68,28 @@ const GRUPOS: MenuGroup[] = [
     key: 'operacao',
     label: 'Operação',
     icon: <WorkOutlineIcon fontSize="small" />,
+    tipo: 'links',
     items: [
       { to: '/pesquisas', label: 'Pesquisas', icon: <DescriptionOutlinedIcon fontSize="small" /> },
       { to: '/ciclos', label: 'Ciclos', icon: <AutorenewOutlinedIcon fontSize="small" /> },
     ],
   },
+  {
+    key: 'analises',
+    label: 'Análises',
+    icon: <AssessmentOutlinedIcon fontSize="small" />,
+    tipo: 'submenus',
+    submenus: [
+      { key: 'quantitativa', label: 'Quantitativa', opcoes: [{ label: 'Em breve', disabled: true }] },
+      { key: 'qualitativa', label: 'Qualitativa', opcoes: [{ label: 'Em breve', disabled: true }] },
+    ],
+  },
 ]
 
 function grupoAtivo(pathname: string): string | null {
-  const grupo = GRUPOS.find((g) => g.items.some((item) => pathname.startsWith(item.to)))
+  const grupo = GRUPOS.find(
+    (g) => g.tipo === 'links' && g.items.some((item) => pathname.startsWith(item.to)),
+  )
   return grupo?.key ?? null
 }
 
@@ -71,6 +98,8 @@ export function PainelAdminLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [grupoAberto, setGrupoAberto] = useState<string | null>(() => grupoAtivo(location.pathname))
+  const [submenuAberto, setSubmenuAberto] = useState<{ key: string; anchorEl: HTMLElement } | null>(null)
+  const fechamentoSubmenuTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   async function handleSair() {
     await sair()
@@ -79,6 +108,25 @@ export function PainelAdminLayout() {
 
   function toggleGrupo(key: string) {
     setGrupoAberto((atual) => (atual === key ? null : key))
+  }
+
+  function abrirSubmenu(key: string, anchorEl: HTMLElement) {
+    if (fechamentoSubmenuTimer.current) {
+      clearTimeout(fechamentoSubmenuTimer.current)
+      fechamentoSubmenuTimer.current = null
+    }
+    setSubmenuAberto({ key, anchorEl })
+  }
+
+  function agendarFechamentoSubmenu() {
+    fechamentoSubmenuTimer.current = setTimeout(() => setSubmenuAberto(null), 150)
+  }
+
+  function cancelarFechamentoSubmenu() {
+    if (fechamentoSubmenuTimer.current) {
+      clearTimeout(fechamentoSubmenuTimer.current)
+      fechamentoSubmenuTimer.current = null
+    }
   }
 
   return (
@@ -126,25 +174,61 @@ export function PainelAdminLayout() {
                   </ListItemButton>
                   <Collapse in={aberto} timeout="auto" unmountOnExit>
                     <List component="div" disablePadding>
-                      {grupo.items.map((item) => (
-                        <ListItemButton
-                          key={item.to}
-                          component={NavLink}
-                          to={item.to}
-                          sx={{
-                            pl: 4,
-                            borderRadius: 2,
-                            '&.active': {
-                              fontWeight: 700,
-                              backgroundColor: 'action.selected',
-                            },
-                          }}
-                        >
-                          <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
-                          <ListItemText primary={item.label} />
-                        </ListItemButton>
-                      ))}
+                      {grupo.tipo === 'links' &&
+                        grupo.items.map((item) => (
+                          <ListItemButton
+                            key={item.to}
+                            component={NavLink}
+                            to={item.to}
+                            sx={{
+                              pl: 4,
+                              borderRadius: 2,
+                              '&.active': {
+                                fontWeight: 700,
+                                backgroundColor: 'action.selected',
+                              },
+                            }}
+                          >
+                            <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+                            <ListItemText primary={item.label} />
+                          </ListItemButton>
+                        ))}
+
+                      {grupo.tipo === 'submenus' &&
+                        grupo.submenus.map((submenu) => (
+                          <ListItemButton
+                            key={submenu.key}
+                            sx={{ pl: 4, borderRadius: 2 }}
+                            onMouseEnter={(event) => abrirSubmenu(submenu.key, event.currentTarget)}
+                            onMouseLeave={agendarFechamentoSubmenu}
+                          >
+                            <ListItemText primary={submenu.label} />
+                          </ListItemButton>
+                        ))}
                     </List>
+
+                    {grupo.tipo === 'submenus' &&
+                      grupo.submenus.map((submenu) => (
+                        <Popper
+                          key={submenu.key}
+                          open={submenuAberto?.key === submenu.key}
+                          anchorEl={submenuAberto?.anchorEl}
+                          placement="right-start"
+                          sx={{ zIndex: (theme) => theme.zIndex.drawer + 2 }}
+                          onMouseEnter={cancelarFechamentoSubmenu}
+                          onMouseLeave={agendarFechamentoSubmenu}
+                        >
+                          <Paper elevation={4} sx={{ borderRadius: 2, ml: 0.5, minWidth: 160 }}>
+                            <MenuList dense>
+                              {submenu.opcoes.map((opcao) => (
+                                <MuiMenuItem key={opcao.label} disabled={opcao.disabled}>
+                                  {opcao.label}
+                                </MuiMenuItem>
+                              ))}
+                            </MenuList>
+                          </Paper>
+                        </Popper>
+                      ))}
                   </Collapse>
                 </Box>
               )

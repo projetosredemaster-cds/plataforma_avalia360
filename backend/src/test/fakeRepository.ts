@@ -4,8 +4,8 @@ type Relacoes = Record<string, boolean> | undefined
 
 /**
  * Repositório TypeORM falso, em memória, cobrindo só o subconjunto de API
- * usado pelos services desta task (`find`, `findOne`, `findOneBy`, `create`,
- * `save`, `delete`). Não há Postgres/Supabase disponível nesta sessão — este
+ * usado pelos services desta task (`find`, `findOne`, `findOneBy`, `count`,
+ * `create`, `save`, `delete`). Não há Postgres/Supabase disponível nesta sessão — este
  * fake substitui `AppDataSource.getRepository(...)` via `vi.mock('.../data-source')`
  * nos specs, mantendo o código de produção (`colaboradores.service.ts`,
  * `equipes.service.ts`, middleware `autenticar`) rodando sem nenhuma
@@ -58,6 +58,11 @@ export class FakeRepository<T extends { id: string }> {
   findOneBy = async (where: Partial<T>): Promise<T | null> => {
     const linha = this.encontrarPorWhere(where)
     return linha ? this.aplicarRelacoes(linha, undefined) : null
+  }
+
+  count = async (opcoes?: { where?: Partial<T> }): Promise<number> => {
+    if (!opcoes?.where) return this.linhas.length
+    return this.linhas.filter((linha) => this.combina(linha, opcoes.where!)).length
   }
 
   save = async (entidade: T): Promise<T> => {

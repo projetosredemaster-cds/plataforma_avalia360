@@ -5,8 +5,10 @@ import {
   atualizarEquipe,
   buscarEquipePorId,
   criarEquipe,
+  listarColaboradoresDaEquipe,
   listarEquipes,
   removerEquipe,
+  vincularColaboradoresEquipe,
 } from './equipes.controller'
 
 const router = Router()
@@ -18,5 +20,7 @@ router.get('/', asyncHandler(listarEquipes))
 router.get('/:id', asyncHandler(buscarEquipePorId))
 router.put('/:id', asyncHandler(atualizarEquipe))
 router.delete('/:id', asyncHandler(removerEquipe))
+router.get('/:id/colaboradores', asyncHandler(listarColaboradoresDaEquipe))
+router.patch('/:id/colaboradores', asyncHandler(vincularColaboradoresEquipe))
 
 export { router as equipesRouter }

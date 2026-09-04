@@ -34,9 +34,10 @@ export const TIPO_PERGUNTA_VALORES: TipoPergunta[] = [
 /**
  * Reflete o enum Postgres `tipo_relacionamento`, criado pela migration do
  * módulo `ciclos-avaliacao` (`relacionamentos_avaliacao.tipo_relacionamento`).
- * Também usada para validar `configuracao.filtroRelacionamento` de perguntas
- * tipo `pessoa` (lista de tipos de relacionamento selecionáveis no
- * formulário, não dado de resposta).
+ * Para a allowlist de `configuracao.filtroRelacionamento` de perguntas tipo
+ * `pessoa` (que inclui a opção adicional `'todos_gestores'`, não um valor
+ * deste enum), ver `TIPO_RELACIONAMENTO_FILTRO_PESSOA_VALORES`/
+ * `FiltroRelacionamentoPessoa` abaixo.
  */
 export type TipoRelacionamento =
   | 'autoavaliacao'
@@ -51,6 +52,37 @@ export const TIPO_RELACIONAMENTO_VALORES: TipoRelacionamento[] = [
   'pares',
   'subordinado',
   'externo',
+]
+
+/**
+ * Allowlist de `configuracao.filtroRelacionamento` (pergunta tipo `pessoa`).
+ * Estende `TipoRelacionamento` com `'todos_gestores'`, que NÃO é um tipo de
+ * relacionamento real — não existe nem existirá linha em
+ * `relacionamentos_avaliacao` com esse valor, e o enum Postgres
+ * `tipo_relacionamento` NUNCA deve ganhar esse valor. É uma opção de ESCOPO
+ * ("liste todo mundo marcado como gestor no ciclo, independente de relação
+ * com quem responde"), não de relação — validada só em aplicação, sobre uma
+ * coluna `jsonb` livre.
+ */
+export type FiltroRelacionamentoPessoa = TipoRelacionamento | 'todos_gestores'
+
+/**
+ * Subconjunto de tipos/opções selecionáveis como filtro de pergunta tipo
+ * `pessoa` (`configuracao.filtroRelacionamento`) — mais restrito que o enum
+ * completo de `TipoRelacionamento` porque `autoavaliacao` nunca contribui
+ * nenhuma opção e `gestor` nunca contribui mais de 1 (não agregam como
+ * filtro), e estendido com `'todos_gestores'`, que não é um
+ * `TipoRelacionamento` real (ver `FiltroRelacionamentoPessoa`) — lista todos
+ * os colaboradores marcados como gestor e participantes do ciclo,
+ * independente de relação com quem responde. `gestor`/`autoavaliacao`
+ * continuam válidos em `relacionamentos_avaliacao.tipo_relacionamento` (motor
+ * de ciclos) — só não são mais oferecidos como filtro nesta pergunta.
+ */
+export const TIPO_RELACIONAMENTO_FILTRO_PESSOA_VALORES: FiltroRelacionamentoPessoa[] = [
+  'pares',
+  'subordinado',
+  'externo',
+  'todos_gestores',
 ]
 
 /**

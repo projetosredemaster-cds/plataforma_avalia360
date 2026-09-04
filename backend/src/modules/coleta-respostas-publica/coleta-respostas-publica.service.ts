@@ -5,7 +5,7 @@ import { env } from '../../config/env'
 import { ErroHttp } from '../../common/erro-http'
 import { LIMITE_TENTATIVAS_CPF_INVALIDAS } from '../../common/limites'
 import { ehUuidValido } from '../../common/uuid'
-import type { TipoPergunta, TipoPesquisa, TipoRelacionamento } from '../../common/enums'
+import type { FiltroRelacionamentoPessoa, TipoPergunta, TipoPesquisa } from '../../common/enums'
 import { Colaborador } from '../colaboradores/colaborador.entity'
 import { CicloAvaliacao } from '../ciclos-avaliacao/ciclo-avaliacao.entity'
 import { RelacionamentoAvaliacao } from '../ciclos-avaliacao/relacionamento-avaliacao.entity'
@@ -227,34 +227,121 @@ async function buscarSessaoValidaOuFalhar(sessaoToken: string): Promise<SessaoRe
 }
 
 /**
- * Resolve as opções de uma pergunta tipo `pessoa`: colaboradores que têm,
- * no MESMO ciclo, um relacionamento com `avaliado_id` igual ao avaliado do
- * relacionamento atual e `tipo_relacionamento` presente em
- * `configuracao.filtroRelacionamento` (ver decisão de modelagem nº 7). Lê só
- * `relacionamentos_avaliacao` (estrutural) — NUNCA `itens_resposta`.
+ * Resolve as opções de uma pergunta tipo `pessoa`: colaboradores que, no
+ * MESMO ciclo, têm um relacionamento com QUEM ESTÁ RESPONDENDO (o
+ * `avaliador_id` do relacionamento atual — `relacionamento.avaliadorId` —
+ * nunca o `avaliado_id`), restrito aos tipos presentes em
+ * `configuracao.filtroRelacionamento`. A direção da relação depende do tipo:
+ * - `pares`: o respondente pode estar de qualquer lado da linha (a geração
+ *   do motor de ciclos já produz as duas direções, mas checamos as duas
+ *   mesmo assim, por defesa) — o colega é o outro lado.
+ * - `gestor`: só linhas em que o respondente é o AVALIADO (é o gestor DO
+ *   respondente que aparece como opção, nunca quem o respondente gerencia).
+ * - `subordinado`: só linhas em que o respondente é o AVALIADO (são os
+ *   subordinados DO respondente).
+ * - `autoavaliacao`: nunca contribui, mesmo se marcado no filtro (não faz
+ *   sentido indicar a si mesmo) — ignorado ao montar as condições.
+ * - `externo`: nenhuma linha desse tipo é gerada hoje pelo motor de ciclos
+ *   (reservado para avaliador convidado manualmente) — não contribui
+ *   nenhuma condição, sem que isso seja um erro.
+ * - `todos_gestores`: IGNORA completamente a relação com o respondente —
+ *   lista todos os colaboradores com `eh_gestor = true` E `ativo = true`
+ *   que sejam `ciclo_participantes` do MESMO ciclo
+ *   (`relacionamento.cicloId`), consultando `ciclo_participantes` ⨝
+ *   `colaboradores` (NUNCA `relacionamentos_avaliacao` para esta branch).
+ *   Combinável com os filtros acima (união dos dois conjuntos de
+ *   resultados, sem duplicar — mesmo dedupe por id já usado). Sempre
+ *   exclui o próprio respondente, mesmo que ele seja gestor.
+ * Se, depois de descartar `autoavaliacao`/`externo`, nenhum tipo válido
+ * sobrar E `todos_gestores` não estiver marcado, retorna `[]` sem consultar
+ * o banco. O resultado é deduplicado por id do colaborador (necessário pela
+ * simetria de `pares`, por segurança quando a mesma pessoa aparece via mais
+ * de um tipo marcado no filtro, e agora também quando a mesma pessoa é ao
+ * mesmo tempo gestor (via `todos_gestores`) e par/subordinado/etc. via
+ * relação).
+ * Lê só `colaboradores`/`ciclo_participantes`/`relacionamentos_avaliacao`
+ * (estrutural) — NUNCA `respostas`/`itens_resposta`, em nenhuma branch.
  */
 async function resolverOpcoesPessoa(
   relacionamento: RelacionamentoAvaliacao,
   configuracao: Record<string, unknown>,
 ): Promise<OpcaoPessoaFormulario[]> {
   const filtro = Array.isArray(configuracao.filtroRelacionamento)
-    ? (configuracao.filtroRelacionamento as TipoRelacionamento[])
+    ? (configuracao.filtroRelacionamento as FiltroRelacionamentoPessoa[])
     : []
-  if (filtro.length === 0) return []
 
-  return AppDataSource.getRepository(RelacionamentoAvaliacao)
-    .createQueryBuilder('r')
-    .innerJoin(Colaborador, 'c', 'c.id = r.avaliador_id')
-    .select('r.avaliador_id', 'id')
-    .addSelect('c.nome_completo', 'nomeCompleto')
-    .where('r.ciclo_id = :cicloId', { cicloId: relacionamento.cicloId })
-    .andWhere('r.avaliado_id = :avaliadoId', { avaliadoId: relacionamento.avaliadoId })
-    .andWhere('r.tipo_relacionamento IN (:...tipos)', { tipos: filtro })
-    // Correção pontual: colaborador desativado não deve aparecer como opção
-    // de resposta na pergunta tipo `pessoa` — mesmo padrão já aplicado em
-    // `confirmarCpf` para avaliador/participante.
-    .andWhere('c.ativo = true')
-    .getRawMany<OpcaoPessoaFormulario>()
+  const respondenteId = relacionamento.avaliadorId
+
+  const condicoes: string[] = []
+  if (filtro.includes('pares')) {
+    condicoes.push(
+      "(r.tipo_relacionamento = 'pares' AND (r.avaliador_id = :respondenteId OR r.avaliado_id = :respondenteId))",
+    )
+  }
+  if (filtro.includes('gestor')) {
+    condicoes.push("(r.tipo_relacionamento = 'gestor' AND r.avaliado_id = :respondenteId)")
+  }
+  if (filtro.includes('subordinado')) {
+    condicoes.push("(r.tipo_relacionamento = 'subordinado' AND r.avaliado_id = :respondenteId)")
+  }
+  // 'autoavaliacao' nunca contribui e 'externo' nunca tem linhas geradas hoje
+  // — nenhum dos dois adiciona uma condição aqui.
+  const incluirTodosGestores = filtro.includes('todos_gestores')
+  if (condicoes.length === 0 && !incluirTodosGestores) return []
+
+  const porId = new Map<string, OpcaoPessoaFormulario>()
+
+  if (condicoes.length > 0) {
+    // Id do colega = o lado da linha que NÃO é o respondente. Funciona igual
+    // para as 3 direções possíveis (pares-como-avaliador, pares-como-avaliado,
+    // gestor/subordinado sempre com o respondente do lado avaliado).
+    const idColegaExpr =
+      'CASE WHEN r.avaliador_id = :respondenteId THEN r.avaliado_id ELSE r.avaliador_id END'
+
+    const linhasRelacao = await AppDataSource.getRepository(RelacionamentoAvaliacao)
+      .createQueryBuilder('r')
+      .innerJoin(Colaborador, 'c', `c.id = (${idColegaExpr})`)
+      .select(idColegaExpr, 'id')
+      .addSelect('c.nome_completo', 'nomeCompleto')
+      .where('r.ciclo_id = :cicloId', { cicloId: relacionamento.cicloId })
+      .andWhere(`(${condicoes.join(' OR ')})`)
+      // Correção pontual anterior, preservada: colaborador desativado não deve
+      // aparecer como opção de resposta na pergunta tipo `pessoa`.
+      .andWhere('c.ativo = true')
+      // Defensivo: nunca oferecer o próprio respondente como opção, mesmo que
+      // as regras acima já não devessem retorná-lo naturalmente.
+      .andWhere(`(${idColegaExpr}) <> :respondenteId`)
+      .setParameter('respondenteId', respondenteId)
+      .getRawMany<OpcaoPessoaFormulario>()
+
+    for (const linha of linhasRelacao) porId.set(linha.id, linha)
+  }
+
+  if (incluirTodosGestores) {
+    // Escopo independente de relação: todo colaborador marcado como gestor E
+    // participante do mesmo ciclo, exceto o próprio respondente — dado
+    // estrutural (grafo "quem é gestor + está no ciclo"), NUNCA conteúdo de
+    // resposta. Consulta só `ciclo_participantes` join `colaboradores`.
+    const linhasGestores = await AppDataSource.getRepository(CicloParticipante)
+      .createQueryBuilder('cp')
+      .innerJoin(Colaborador, 'c', 'c.id = cp.colaborador_id')
+      .select('c.id', 'id')
+      .addSelect('c.nome_completo', 'nomeCompleto')
+      .where('cp.ciclo_id = :cicloId', { cicloId: relacionamento.cicloId })
+      .andWhere('c.eh_gestor = true')
+      .andWhere('c.ativo = true')
+      .andWhere('c.id <> :respondenteId', { respondenteId })
+      .getRawMany<OpcaoPessoaFormulario>()
+
+    for (const linha of linhasGestores) porId.set(linha.id, linha)
+  }
+
+  // Deduplica por id — necessário pela simetria de `pares` (mesmo colega via
+  // as duas direções), por segurança quando a mesma pessoa aparece via mais
+  // de um tipo marcado no filtro, e agora também quando a mesma pessoa é ao
+  // mesmo tempo gestor (via `todos_gestores`) e par/subordinado/etc. (via
+  // relação) — o `Map` já cobre os 3 casos sem lógica extra.
+  return Array.from(porId.values())
 }
 
 /**

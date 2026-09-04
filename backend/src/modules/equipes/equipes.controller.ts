@@ -29,3 +29,19 @@ export async function removerEquipe(req: Request, res: Response): Promise<void> 
   await equipesService.remover(req.colaboradorAutenticado!, id)
   res.status(204).send()
 }
+
+export async function listarColaboradoresDaEquipe(req: Request, res: Response): Promise<void> {
+  const id = obterParametroRota(req, 'id')
+  const resposta = await equipesService.listarColaboradoresDaEquipe(req.colaboradorAutenticado!, id)
+  res.status(200).json(resposta)
+}
+
+export async function vincularColaboradoresEquipe(req: Request, res: Response): Promise<void> {
+  const id = obterParametroRota(req, 'id')
+  const resposta = await equipesService.vincularColaboradoresEquipe(
+    req.colaboradorAutenticado!,
+    id,
+    req.body,
+  )
+  res.status(200).json(resposta)
+}
