@@ -42,11 +42,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [colaborador, setColaborador] = useState<ColaboradorAutenticado | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const versaoRef = useRef(0)
+  // Id do colaborador já confirmado — usado pelo handler de onAuthStateChange para
+  // diferenciar um SIGNED_IN de login real de um SIGNED_IN que o supabase-js
+  // reemite ao recuperar do storage uma sessão já válida (refoco de aba, ver
+  // GoTrueClient._recoverAndRefresh): nesse caso o id não muda e não há motivo
+  // para tratar como sessão nova.
+  const colaboradorIdRef = useRef<string | null>(null)
 
   const resolverColaborador = useCallback(() => {
     const versaoAtual = versaoRef.current + 1
     versaoRef.current = versaoAtual
-    setStatus('carregando')
+    // Só passa por 'carregando' no carregamento inicial (nenhum colaborador
+    // confirmado ainda). Uma revalidação em background com colaborador já
+    // carregado atualiza o resultado direto no fim, sem desmontar o <Outlet/>
+    // por uma checagem que só confirma o que já se sabia.
+    const carregamentoInicial = colaboradorIdRef.current === null
+    if (carregamentoInicial) {
+      setStatus('carregando')
+    }
     setErro(null)
 
     void (async () => {
@@ -54,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!data.session) {
         if (versaoRef.current === versaoAtual) {
+          colaboradorIdRef.current = null
           setColaborador(null)
           setStatus('nao_autenticado')
         }
@@ -64,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const perfil = await apiFetch<PerfilAutenticado>('/api/auth/me')
         if (versaoRef.current !== versaoAtual) return
 
+        colaboradorIdRef.current = perfil.id
         setColaborador({
           id: perfil.id,
           nomeCompleto: perfil.nomeCompleto,
@@ -73,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus('autenticado')
       } catch (err) {
         if (versaoRef.current !== versaoAtual) return
+        colaboradorIdRef.current = null
         setColaborador(null)
         setErro(err instanceof ApiError ? err.message : 'Não foi possível confirmar sua sessão.')
         setStatus('erro')
@@ -88,8 +104,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     resolverColaborador()
 
-    const { data: assinatura } = supabase.auth.onAuthStateChange(() => {
-      resolverColaborador()
+    const { data: assinatura } = supabase.auth.onAuthStateChange((event, session) => {
+      // TOKEN_REFRESHED/INITIAL_SESSION/USER_UPDATED são rotineiros (renovação
+      // periódica de token, reavaliação de sessão) e não mudam a identidade
+      // logada — seguem ignorados.
+      if (event === 'SIGNED_OUT') {
+        resolverColaborador()
+        return
+      }
+
+      if (event === 'SIGNED_IN') {
+        // O supabase-js reemite 'SIGNED_IN' ao recuperar do storage uma sessão
+        // já válida no refoco da aba — não é um login novo. Só reage se o id do
+        // usuário realmente mudou (login de fato, inclusive troca de usuário
+        // na mesma aba).
+        const semColaboradorCarregado = colaboradorIdRef.current === null
+        const idDaSessaoMudou = (session?.user?.id ?? null) !== colaboradorIdRef.current
+        if (semColaboradorCarregado || idDaSessaoMudou) {
+          resolverColaborador()
+        }
+      }
     })
 
     return () => {

@@ -51,12 +51,12 @@ schema descreve `titulo`+`descricao` e vínculo via jsonb — já implementado p
 usuário.
 
 `backend/scripts/` existe para scripts pontuais de diagnóstico/verificação (não é suite
-de teste formal, não roda em CI, não faz parte do build) — ex.:
-`verificar-resolver-opcoes-pessoa.ts`, que semeia dados prefixados `ZTeste_` via funções
-de service reais e compara o resultado de uma função contra um gabarito calculado à mão,
-imprimindo (sem executar) o SQL de limpeza ao final. Mesma regra de nunca rodar contra um
-banco real sem confirmação explícita se aplica a qualquer script desse diretório que grave
-dado.
+de teste formal, não roda em CI, não faz parte do build) — atualmente vazio (o script
+que existia aqui, `verificar-resolver-opcoes-pessoa.ts`, foi removido). Um script desse
+diretório tipicamente semeia dados prefixados `ZTeste_` via funções de service reais e
+compara o resultado de uma função contra um gabarito calculado à mão, imprimindo (sem
+executar) o SQL de limpeza ao final. Mesma regra de nunca rodar contra um banco real sem
+confirmação explícita se aplica a qualquer script desse diretório que grave dado.
 
 ## Comandos
 
