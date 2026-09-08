@@ -55,6 +55,16 @@ type MenuGroup =
 
 const GRUPOS: MenuGroup[] = [
   {
+    key: 'analises',
+    label: 'Análises',
+    icon: <AssessmentOutlinedIcon fontSize="small" />,
+    tipo: 'submenus',
+    submenus: [
+      { key: 'quantitativa', label: 'Quantitativa', opcoes: [{ label: 'Em breve', disabled: true }] },
+      { key: 'qualitativa', label: 'Qualitativa', opcoes: [{ label: 'Em breve', disabled: true }] },
+    ],
+  },
+  {
     key: 'cadastro',
     label: 'Cadastro',
     icon: <BadgeOutlinedIcon fontSize="small" />,
@@ -72,16 +82,6 @@ const GRUPOS: MenuGroup[] = [
     items: [
       { to: '/pesquisas', label: 'Pesquisas', icon: <DescriptionOutlinedIcon fontSize="small" /> },
       { to: '/ciclos', label: 'Ciclos', icon: <AutorenewOutlinedIcon fontSize="small" /> },
-    ],
-  },
-  {
-    key: 'analises',
-    label: 'Análises',
-    icon: <AssessmentOutlinedIcon fontSize="small" />,
-    tipo: 'submenus',
-    submenus: [
-      { key: 'quantitativa', label: 'Quantitativa', opcoes: [{ label: 'Em breve', disabled: true }] },
-      { key: 'qualitativa', label: 'Qualitativa', opcoes: [{ label: 'Em breve', disabled: true }] },
     ],
   },
 ]
