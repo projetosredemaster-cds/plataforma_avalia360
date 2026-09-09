@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Autocomplete,
@@ -20,18 +20,22 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
+import RefreshIcon from '@mui/icons-material/Refresh'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog'
 import { TabelaEstado } from '../../components/TabelaEstado/TabelaEstado'
+import { ProgressoCicloBar } from '../../components/ciclos/ProgressoCicloBar/ProgressoCicloBar'
 import { StatusCicloChip } from '../../components/ciclos/StatusCicloChip/StatusCicloChip'
 import { StatusEnvioChip } from '../../components/ciclos/StatusEnvioChip/StatusEnvioChip'
 import { ROTULOS_TIPO_RELACIONAMENTO } from '../../components/ciclos/rotulosTipoRelacionamento'
 import { StatusPesquisaChip } from '../../components/pesquisas/StatusPesquisaChip/StatusPesquisaChip'
 import { TipoPesquisaChip } from '../../components/pesquisas/TipoPesquisaChip/TipoPesquisaChip'
 import { ApiError } from '../../lib/apiClient'
+import { marcarComoVisto } from '../../lib/progressoConhecidoCiclos'
 import { listarColaboradores } from '../../services/colaboradoresService'
 import { listarEquipes } from '../../services/equipesService'
-import { atualizarStatusCiclo, buscarCiclo, listarRelacionamentos } from '../../services/ciclosService'
+import { atualizarStatusCiclo, buscarCiclo, buscarProgressoCiclo, listarRelacionamentos } from '../../services/ciclosService'
 import {
   desbloquearTentativas,
   expirarEnvio,
@@ -72,6 +76,35 @@ function rotuloAlvoExpirar(envio: EnvioPesquisaAcao | null): string {
   return ehEnvioAvaliacao360(envio)
     ? `de "${envio.avaliadorNome}" para "${envio.avaliadoNome}"`
     : 'da campanha de clima e satisfação deste ciclo'
+}
+
+/**
+ * Bip curto (~0.25s, senoide com fade-out) via Web Audio API nativa — sem
+ * nenhum arquivo de áudio novo em `public/`. Silenciosamente ignorado em
+ * ambientes sem suporte (ex.: `AudioContext` indisponível).
+ */
+function tocarSomNotificacao() {
+  try {
+    const AudioContextCtor =
+      window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const contexto = new AudioContextCtor()
+    const oscilador = contexto.createOscillator()
+    const ganho = contexto.createGain()
+    oscilador.type = 'sine'
+    oscilador.frequency.value = 880
+    oscilador.connect(ganho)
+    ganho.connect(contexto.destination)
+    const agora = contexto.currentTime
+    ganho.gain.setValueAtTime(0.2, agora)
+    ganho.gain.exponentialRampToValueAtTime(0.0001, agora + 0.25)
+    oscilador.start(agora)
+    oscilador.stop(agora + 0.3)
+    oscilador.onended = () => {
+      contexto.close().catch(() => {})
+    }
+  } catch {
+    // Ambiente sem suporte a Web Audio API — notificação sonora é best-effort.
+  }
 }
 
 /**
@@ -141,6 +174,13 @@ export function CicloDetalhePage() {
   const [encerrando, setEncerrando] = useState(false)
   const [erroEncerrar, setErroEncerrar] = useState<string | null>(null)
 
+  const [atualizando, setAtualizando] = useState(false)
+  const [novasRespostas, setNovasRespostas] = useState(0)
+  /** Contagem de referência ("respostas conhecidas até a última atualização completa"). */
+  const baselineConcluidosRef = useRef<number | null>(null)
+  /** Maior delta já notificado desde o último baseline — evita repetir o som a cada tick sem resposta nova. */
+  const ultimoDeltaNotificadoRef = useRef(0)
+
   const carregarRelacionamentos = useCallback(async (cicloId: string) => {
     setCarregandoRelacionamentos(true)
     setErroRelacionamentos(null)
@@ -195,6 +235,8 @@ export function CicloDetalhePage() {
         listarEquipes(),
       ])
       setCiclo(dadosCiclo)
+      baselineConcluidosRef.current = dadosCiclo.progresso.concluidos
+      marcarComoVisto(id, dadosCiclo.progresso.concluidos)
       setParticipantes(dadosParticipantes)
       setPesquisas(dadosPesquisas)
       setColaboradores(dadosColaboradores)
@@ -227,6 +269,71 @@ export function CicloDetalhePage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     carregar()
   }, [carregar])
+
+  /**
+   * Refresh manual: reaproveita `buscarCiclo` + `carregarEnvios`/
+   * `carregarRelacionamentos` (mesma condição de `carregar()`), sem
+   * refazer `listarParticipantes`/`listarPesquisas`/`listarColaboradores`/
+   * `listarEquipes` — fora do escopo (só formulários de adicionar
+   * participante/vincular pesquisa). Também reseta o baseline do polling e
+   * limpa a notificação de novas respostas.
+   */
+  async function handleAtualizar() {
+    if (!id) return
+    setAtualizando(true)
+    try {
+      const dadosCiclo = await buscarCiclo(id)
+      setCiclo(dadosCiclo)
+      if (dadosCiclo.status !== 'rascunho') {
+        carregarEnvios(id)
+        const pesquisaDoCiclo = pesquisas.find((p) => p.cicloId === dadosCiclo.id) ?? null
+        if (pesquisaDoCiclo?.tipo !== 'clima_geral') {
+          carregarRelacionamentos(id)
+        }
+      }
+      baselineConcluidosRef.current = dadosCiclo.progresso.concluidos
+      marcarComoVisto(id, dadosCiclo.progresso.concluidos)
+      ultimoDeltaNotificadoRef.current = 0
+      setNovasRespostas(0)
+    } catch (err) {
+      setSnackbar({
+        mensagem: err instanceof ApiError ? err.message : 'Não foi possível atualizar os dados do ciclo.',
+        severidade: 'error',
+      })
+    } finally {
+      setAtualizando(false)
+    }
+  }
+
+  /**
+   * Polling leve (só contagem, via `GET /api/ciclos/:id/progresso`) a cada
+   * 30s — nunca refaz a tabela completa, só compara `progresso.concluidos`
+   * contra o baseline pra decidir se avisa (notificação + som) sobre novas
+   * respostas. Erros de tick são silenciosos (não usam `snackbar`/
+   * `erroCarregamento`) — só tenta de novo no próximo tick. Cleanup do
+   * `setInterval` é obrigatório: para o polling ao desmontar a tela ou
+   * trocar de ciclo (`id` muda).
+   */
+  useEffect(() => {
+    if (!id) return
+    const intervalId = window.setInterval(async () => {
+      try {
+        const progresso = await buscarProgressoCiclo(id)
+        if (baselineConcluidosRef.current !== null) {
+          const delta = progresso.concluidos - baselineConcluidosRef.current
+          if (delta > ultimoDeltaNotificadoRef.current) {
+            ultimoDeltaNotificadoRef.current = delta
+            setNovasRespostas(delta)
+            tocarSomNotificacao()
+          }
+        }
+      } catch {
+        // Tick de polling silencioso — falha não deve incomodar o usuário.
+      }
+    }, 30000)
+
+    return () => window.clearInterval(intervalId)
+  }, [id])
 
   const colaboradoresAtivosDisponiveis = useMemo(() => {
     const idsParticipantes = new Set(participantes.map((p) => p.colaboradorId))
@@ -349,10 +456,11 @@ export function CicloDetalhePage() {
   /**
    * Ativação dispara a geração de `relacionamentos_avaliacao` no backend a
    * partir dos participantes atuais — irreversível, por isso o
-   * `ConfirmDialog` abaixo é explícito sobre isso. Esta ação só valida
-   * client-side a existência de participantes (espelhando
-   * `422 CICLO_SEM_PARTICIPANTES`); não checa se há pesquisa vinculada, mesmo
-   * critério do backend (ver "Perguntas em aberto" #1 em task-frontend.md).
+   * `ConfirmDialog` abaixo é explícito sobre isso. O botão que aciona esta
+   * função já é gated por `ciclo.elegibilidadeAtivacao.elegivel`, que reflete
+   * as 3 regras completas do backend (participantes, pesquisa publicada
+   * vinculada e tipo de relacionamento selecionado) — nenhuma regra é
+   * duplicada aqui no cliente.
    */
   async function handleConfirmarAtivar() {
     if (!ciclo) return
@@ -495,21 +603,26 @@ export function CicloDetalhePage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Typography variant="h5" component="h1">
-            {ciclo.nome}
-          </Typography>
-          <StatusCicloChip status={ciclo.status} />
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Typography variant="h5" component="h1">
+              {ciclo.nome}
+            </Typography>
+            <StatusCicloChip status={ciclo.status} />
+          </div>
+          <div className="max-w-xs">
+            <ProgressoCicloBar progresso={ciclo.progresso} />
+          </div>
         </div>
         <div className="flex flex-col items-end gap-1">
           {ciclo.status === 'rascunho' && (
-            <Tooltip title={participantes.length === 0 ? 'Adicione ao menos um participante antes de ativar.' : ''}>
+            <Tooltip title={ciclo.elegibilidadeAtivacao.motivoBloqueio ?? ''}>
               <span>
                 <Button
                   variant="contained"
                   color="primary"
-                  disabled={participantes.length === 0}
+                  disabled={!ciclo.elegibilidadeAtivacao.elegivel}
                   onClick={() => {
                     setErroAtivar(null)
                     setConfirmarAtivar(true)
@@ -752,10 +865,26 @@ export function CicloDetalhePage() {
         </Card>
       )}
 
+      {novasRespostas > 0 && (
+        <Alert severity="info" icon={<NotificationsActiveIcon />}>
+          {`${novasRespostas} nova${novasRespostas > 1 ? 's' : ''} resposta${novasRespostas > 1 ? 's' : ''} recebida${novasRespostas > 1 ? 's' : ''}.`}
+        </Alert>
+      )}
+
       {ciclo.status !== 'rascunho' && tipoPesquisaCiclo !== 'clima_geral' && (
         <Card>
           <CardContent className="flex flex-col gap-4">
-            <Typography variant="subtitle1">Envios</Typography>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Typography variant="subtitle1">Envios</Typography>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={handleAtualizar}
+                disabled={atualizando}
+              >
+                {atualizando ? 'Atualizando...' : 'Atualizar'}
+              </Button>
+            </div>
             <Typography variant="body2" color="text.secondary">
               Controle manual de envio do link de resposta — o link é copiado e compartilhado pelo admin fora da
               plataforma (e-mail, WhatsApp, etc.); esta tela só registra o status. Dado identificado — visível apenas
@@ -862,7 +991,17 @@ export function CicloDetalhePage() {
       {ciclo.status !== 'rascunho' && tipoPesquisaCiclo === 'clima_geral' && (
         <Card>
           <CardContent className="flex flex-col gap-4">
-            <Typography variant="subtitle1">Participantes e envios</Typography>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Typography variant="subtitle1">Participantes e envios</Typography>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={handleAtualizar}
+                disabled={atualizando}
+              >
+                {atualizando ? 'Atualizando...' : 'Atualizar'}
+              </Button>
+            </div>
             <Typography variant="body2" color="text.secondary">
               Pesquisa de clima e satisfação — link único, compartilhado com todos os participantes do ciclo. O
               colaborador acessa o link e confirma o CPF para liberar o formulário. Esta tela só controla o envio

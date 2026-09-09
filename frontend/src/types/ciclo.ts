@@ -10,6 +10,31 @@ export type TipoRelacionamento = 'autoavaliacao' | 'gestor' | 'pares' | 'subordi
  */
 export type TipoRelacionamentoGeravel = 'autoavaliacao' | 'gestor' | 'pares' | 'subordinado'
 
+/**
+ * Espelha a regra completa de ativação já calculada pelo backend
+ * (`avaliarElegibilidadeAtivacao`) — nunca recalcular client-side.
+ * `motivoBloqueio`/`codigoBloqueio` só vêm não-nulos quando `elegivel ===
+ * false` e o ciclo está em `rascunho`.
+ */
+export interface ElegibilidadeAtivacao {
+  elegivel: boolean
+  motivoBloqueio: string | null
+  codigoBloqueio: string | null
+}
+
+/**
+ * Percentual de "conclusões individuais" já agregado pelo backend —
+ * relacionamentos com resposta (avaliação 360) ou `ciclo_participantes.respondeu_em`
+ * preenchido (clima). `total === 0` sempre que ainda não há nada a contar
+ * (`percentual` sempre 0 nesse caso). Nunca deriva de dado identificado de
+ * quem avaliou quem.
+ */
+export interface ProgressoCiclo {
+  total: number
+  concluidos: number
+  percentual: number
+}
+
 export interface Ciclo {
   id: string
   nome: string
@@ -26,6 +51,8 @@ export interface Ciclo {
    * vale para os outros campos editáveis do ciclo).
    */
   tiposRelacionamentoGerados: TipoRelacionamentoGeravel[]
+  elegibilidadeAtivacao: ElegibilidadeAtivacao
+  progresso: ProgressoCiclo
   criadoPor: string | null
   criadoEm: string
   atualizadoEm: string

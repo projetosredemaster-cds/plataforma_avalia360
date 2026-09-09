@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  Badge,
   Button,
   Card,
   CardActions,
@@ -16,9 +17,11 @@ import {
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog'
+import { ProgressoCicloBar } from '../../components/ciclos/ProgressoCicloBar/ProgressoCicloBar'
 import { StatusCicloChip } from '../../components/ciclos/StatusCicloChip/StatusCicloChip'
 import { ApiError } from '../../lib/apiClient'
-import { listarCiclos, removerCiclo } from '../../services/ciclosService'
+import { houveNovaResposta, inicializarBaselineSeAusente } from '../../lib/progressoConhecidoCiclos'
+import { atualizarStatusCiclo, listarCiclos, removerCiclo } from '../../services/ciclosService'
 import type { Ciclo, StatusCiclo } from '../../types/ciclo'
 
 type FiltroStatus = 'todas' | StatusCiclo
@@ -50,24 +53,68 @@ export function CiclosListPage() {
   const [excluindo, setExcluindo] = useState(false)
   const [erroExcluir, setErroExcluir] = useState<string | null>(null)
 
+  const [alvoAtivar, setAlvoAtivar] = useState<Ciclo | null>(null)
+  const [ativando, setAtivando] = useState(false)
+  const [erroAtivar, setErroAtivar] = useState<string | null>(null)
+
+  const [ciclosComNovaResposta, setCiclosComNovaResposta] = useState<Set<string>>(new Set())
+
+  /**
+   * Atualiza baselines/badges de "nova resposta" a partir de uma lista de
+   * ciclos já carregada — reaproveitado tanto pela carga/recarga completa
+   * (`carregarCiclos`) quanto pelo polling silencioso abaixo. Toda a lógica
+   * de comparação baseline-vs-contagem-atual vive em
+   * `lib/progressoConhecidoCiclos.ts`, compartilhada com `CicloDetalhePage`.
+   */
+  const processarProgressoConhecido = useCallback((dados: Ciclo[]) => {
+    dados.forEach((ciclo) => inicializarBaselineSeAusente(ciclo.id, ciclo.progresso.concluidos))
+    setCiclosComNovaResposta(
+      new Set(dados.filter((ciclo) => houveNovaResposta(ciclo.id, ciclo.progresso.concluidos)).map((c) => c.id)),
+    )
+  }, [])
+
   const carregarCiclos = useCallback(async () => {
     setCarregando(true)
     setErro(null)
     try {
       const dados = await listarCiclos()
       setCiclos(dados)
+      processarProgressoConhecido(dados)
     } catch (err) {
       setErro(err instanceof ApiError ? err.message : 'Não foi possível carregar os ciclos.')
     } finally {
       setCarregando(false)
     }
-  }, [])
+  }, [processarProgressoConhecido])
 
   useEffect(() => {
     // Carga inicial dos ciclos via API — não é dado derivável durante a renderização.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     carregarCiclos()
   }, [carregarCiclos])
+
+  /**
+   * Polling leve a cada 30s — chama `listarCiclos()` direto (não
+   * `carregarCiclos()`, que liga `setCarregando(true)` e faria a lista
+   * inteira "piscar" com o skeleton a cada tick). Atualiza só os badges de
+   * "nova resposta" via `processarProgressoConhecido`; nunca chama
+   * `setCiclos`, então os cards (barra de progresso, status, etc.) só mudam
+   * quando o usuário efetivamente recarrega a lista — mesmo princípio do
+   * polling silencioso já usado em `CicloDetalhePage`. Erros de tick são
+   * silenciosos. Cleanup do `setInterval` para o polling ao desmontar a
+   * página (troca de rota).
+   */
+  useEffect(() => {
+    const intervalId = window.setInterval(async () => {
+      try {
+        const dados = await listarCiclos()
+        processarProgressoConhecido(dados)
+      } catch {
+        // Tick de polling silencioso — mesmo padrão do detalhe do ciclo.
+      }
+    }, 30000)
+    return () => window.clearInterval(intervalId)
+  }, [processarProgressoConhecido])
 
   useEffect(() => {
     const timer = setTimeout(() => setBusca(buscaInput), 400)
@@ -97,6 +144,21 @@ export function CiclosListPage() {
       setErroExcluir(err instanceof ApiError ? err.message : 'Não foi possível excluir o ciclo.')
     } finally {
       setExcluindo(false)
+    }
+  }
+
+  async function handleConfirmarAtivar() {
+    if (!alvoAtivar) return
+    setAtivando(true)
+    setErroAtivar(null)
+    try {
+      await atualizarStatusCiclo(alvoAtivar.id, 'ativo')
+      setAlvoAtivar(null)
+      await carregarCiclos()
+    } catch (err) {
+      setErroAtivar(err instanceof ApiError ? err.message : 'Não foi possível ativar o ciclo.')
+    } finally {
+      setAtivando(false)
     }
   }
 
@@ -180,7 +242,13 @@ export function CiclosListPage() {
                           {ciclo.nome}
                         </Typography>
                       </Tooltip>
-                      <StatusCicloChip status={ciclo.status} />
+                      <Badge
+                        color="error"
+                        variant="dot"
+                        invisible={!(ciclo.status === 'ativo' && ciclosComNovaResposta.has(ciclo.id))}
+                      >
+                        <StatusCicloChip status={ciclo.status} />
+                      </Badge>
                     </div>
                     <Typography variant="body2" color="text.secondary">
                       {formatarData(ciclo.dataInicio)} — {formatarData(ciclo.dataFim)}
@@ -204,22 +272,41 @@ export function CiclosListPage() {
                         label={`Pares anonimizados: ${ciclo.anonimizarRespostasPares ? 'Sim' : 'Não'}`}
                       />
                     </div>
+                    <ProgressoCicloBar progresso={ciclo.progresso} />
                   </CardContent>
                   <CardActions className="flex flex-wrap justify-end gap-1">
                     <Button size="small" onClick={() => navigate(`/ciclos/${ciclo.id}`)}>
                       Ver detalhes
                     </Button>
                     {ciclo.status === 'rascunho' && (
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => {
-                          setErroExcluir(null)
-                          setAlvoExcluir(ciclo)
-                        }}
-                      >
-                        Excluir
-                      </Button>
+                      <>
+                        <Tooltip title={ciclo.elegibilidadeAtivacao.motivoBloqueio ?? ''}>
+                          <span>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="primary"
+                              disabled={!ciclo.elegibilidadeAtivacao.elegivel}
+                              onClick={() => {
+                                setErroAtivar(null)
+                                setAlvoAtivar(ciclo)
+                              }}
+                            >
+                              Ativar ciclo
+                            </Button>
+                          </span>
+                        </Tooltip>
+                        <Button
+                          size="small"
+                          color="error"
+                          onClick={() => {
+                            setErroExcluir(null)
+                            setAlvoExcluir(ciclo)
+                          }}
+                        >
+                          Excluir
+                        </Button>
+                      </>
                     )}
                   </CardActions>
                 </Card>
@@ -241,6 +328,21 @@ export function CiclosListPage() {
           if (excluindo) return
           setAlvoExcluir(null)
           setErroExcluir(null)
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(alvoAtivar)}
+        titulo="Ativar ciclo"
+        mensagem="Ativar este ciclo? Os relacionamentos de avaliação (quem avalia quem) serão gerados automaticamente a partir dos participantes atuais, e não será mais possível editar o ciclo, seus participantes ou a pesquisa vinculada depois disso."
+        confirmarLabel="Ativar"
+        carregando={ativando}
+        erro={erroAtivar}
+        onConfirmar={handleConfirmarAtivar}
+        onCancelar={() => {
+          if (ativando) return
+          setAlvoAtivar(null)
+          setErroAtivar(null)
         }}
       />
     </div>

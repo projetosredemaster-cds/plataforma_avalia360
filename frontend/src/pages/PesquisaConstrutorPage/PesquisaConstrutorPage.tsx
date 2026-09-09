@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Card, CardContent, CircularProgress, MenuItem, Snackbar, TextField, Typography } from '@mui/material'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { StatusPesquisaChip } from '../../components/pesquisas/StatusPesquisaChip/StatusPesquisaChip'
@@ -188,10 +188,7 @@ export function PesquisaConstrutorPage() {
     }
   }
 
-  const podePublicar = useMemo(
-    () => Boolean(pesquisa) && (pesquisa?.paginas.some((p) => p.perguntas.length > 0) ?? false),
-    [pesquisa],
-  )
+  const podePublicar = pesquisa?.elegibilidadePublicacao.elegivel ?? false
 
   async function handlePublicar() {
     if (!pesquisa) return
@@ -305,9 +302,9 @@ export function PesquisaConstrutorPage() {
             <Button variant="contained" color="primary" onClick={handlePublicar} disabled={publicando || !podePublicar}>
               {publicando ? 'Publicando...' : 'Publicar'}
             </Button>
-            {!podePublicar && (
+            {!podePublicar && pesquisa.elegibilidadePublicacao.motivoBloqueio && (
               <Typography variant="caption" color="text.secondary">
-                Adicione ao menos 1 página com 1 pergunta para publicar.
+                {pesquisa.elegibilidadePublicacao.motivoBloqueio}
               </Typography>
             )}
           </div>

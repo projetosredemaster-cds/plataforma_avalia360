@@ -1,5 +1,5 @@
 import { apiFetch } from '../lib/apiClient'
-import type { Ciclo, Relacionamento, StatusCiclo, TipoRelacionamentoGeravel } from '../types/ciclo'
+import type { Ciclo, ProgressoCiclo, Relacionamento, StatusCiclo, TipoRelacionamentoGeravel } from '../types/ciclo'
 
 /** Corpo de `POST /api/ciclos`. */
 export interface CriarCicloPayload {
@@ -67,4 +67,12 @@ export function atualizarStatusCiclo(id: string, status: StatusCiclo): Promise<C
  */
 export function listarRelacionamentos(id: string): Promise<Relacionamento[]> {
   return apiFetch<Relacionamento[]>(`/api/ciclos/${id}/relacionamentos`)
+}
+
+/**
+ * Rota leve (só `COUNT`, sem elegibilidade/relacionamentos/participantes) —
+ * feita propositalmente para polling barato de `CicloDetalhePage`.
+ */
+export function buscarProgressoCiclo(id: string): Promise<ProgressoCiclo> {
+  return apiFetch<ProgressoCiclo>(`/api/ciclos/${id}/progresso`)
 }

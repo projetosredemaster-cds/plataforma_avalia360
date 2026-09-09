@@ -53,6 +53,7 @@ export function PesquisasListPage() {
   const [erroExcluir, setErroExcluir] = useState<string | null>(null)
 
   const [duplicandoId, setDuplicandoId] = useState<string | null>(null)
+  const [publicandoId, setPublicandoId] = useState<string | null>(null)
   const [snackbar, setSnackbar] = useState<{ mensagem: string; severidade: 'success' | 'error' } | null>(null)
 
   const carregarPesquisas = useCallback(async () => {
@@ -121,6 +122,22 @@ export function PesquisasListPage() {
       })
     } finally {
       setDuplicandoId(null)
+    }
+  }
+
+  async function handlePublicar(pesquisa: PesquisaResumo) {
+    setPublicandoId(pesquisa.id)
+    try {
+      await atualizarStatusPesquisa(pesquisa.id, 'publicada')
+      setSnackbar({ mensagem: 'Pesquisa publicada com sucesso.', severidade: 'success' })
+      await carregarPesquisas()
+    } catch (err) {
+      setSnackbar({
+        mensagem: err instanceof ApiError ? err.message : 'Não foi possível publicar a pesquisa.',
+        severidade: 'error',
+      })
+    } finally {
+      setPublicandoId(null)
     }
   }
 
@@ -261,7 +278,7 @@ export function PesquisasListPage() {
                   </CardContent>
                   <CardActions className="flex flex-wrap justify-end gap-1">
                     <Button size="small" onClick={() => navigate(`/pesquisas/${pesquisa.id}/editar`)}>
-                      Editar
+                      {pesquisa.status === 'rascunho' ? 'Editar' : 'Ver detalhes'}
                     </Button>
                     <Button size="small" onClick={() => handleDuplicar(pesquisa)} disabled={duplicandoId === pesquisa.id}>
                       {duplicandoId === pesquisa.id ? 'Duplicando...' : 'Duplicar'}
@@ -279,16 +296,31 @@ export function PesquisasListPage() {
                       </Button>
                     )}
                     {pesquisa.status === 'rascunho' && (
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => {
-                          setErroExcluir(null)
-                          setAlvoExcluir(pesquisa)
-                        }}
-                      >
-                        Deletar
-                      </Button>
+                      <>
+                        <Tooltip title={pesquisa.elegibilidadePublicacao.motivoBloqueio ?? ''}>
+                          <span>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="primary"
+                              disabled={!pesquisa.elegibilidadePublicacao.elegivel || publicandoId === pesquisa.id}
+                              onClick={() => handlePublicar(pesquisa)}
+                            >
+                              {publicandoId === pesquisa.id ? 'Publicando...' : 'Publicar'}
+                            </Button>
+                          </span>
+                        </Tooltip>
+                        <Button
+                          size="small"
+                          color="error"
+                          onClick={() => {
+                            setErroExcluir(null)
+                            setAlvoExcluir(pesquisa)
+                          }}
+                        >
+                          Deletar
+                        </Button>
+                      </>
                     )}
                   </CardActions>
                 </Card>

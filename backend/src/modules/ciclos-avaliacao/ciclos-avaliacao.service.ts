@@ -12,8 +12,10 @@ import { validarEnum, validarListaEnum, validarTextoObrigatorio } from '../../co
 import type { ColaboradorAutenticado } from '../../types/express'
 import { Colaborador } from '../colaboradores/colaborador.entity'
 import { CicloParticipante } from '../ciclo-participantes/ciclo-participante.entity'
+import { EnvioPesquisa } from '../envios-pesquisa/envio-pesquisa.entity'
 import { gerarEnviosClima, gerarEnviosPesquisa } from '../envios-pesquisa/envios-pesquisa.service'
 import { Pesquisa } from '../pesquisas/pesquisa.entity'
+import { Resposta } from '../respostas/resposta.entity'
 import type { AtualizarCicloDto } from './dto/atualizar-ciclo.dto'
 import type { AtualizarStatusCicloDto } from './dto/atualizar-status-ciclo.dto'
 import type { CriarCicloDto } from './dto/criar-ciclo.dto'
@@ -31,6 +33,23 @@ const TRANSICOES_VALIDAS: Record<StatusCiclo, StatusCiclo[]> = {
   encerrado: [],
 }
 
+type CodigoBloqueioAtivacao =
+  | 'CICLO_SEM_PARTICIPANTES'
+  | 'CICLO_SEM_PESQUISA_PUBLICADA'
+  | 'CICLO_SEM_TIPO_RELACIONAMENTO'
+
+export interface ElegibilidadeAtivacao {
+  elegivel: boolean
+  motivoBloqueio: string | null
+  codigoBloqueio: CodigoBloqueioAtivacao | null
+}
+
+export interface ProgressoCiclo {
+  total: number
+  concluidos: number
+  percentual: number
+}
+
 export interface CicloResposta {
   id: string
   nome: string
@@ -41,6 +60,8 @@ export interface CicloResposta {
   anonimizarRespostasPares: boolean
   minimoRespostasPares: number
   tiposRelacionamentoGerados: TipoRelacionamento[]
+  elegibilidadeAtivacao: ElegibilidadeAtivacao
+  progresso: ProgressoCiclo
   criadoPor: string | null
   criadoEm: string
   atualizadoEm: string
@@ -60,7 +81,145 @@ function repositorio() {
   return AppDataSource.getRepository(CicloAvaliacao)
 }
 
-function mapearCiclo(ciclo: CicloAvaliacao): CicloResposta {
+/**
+ * Regra pura de "pode ativar" — extraída de `atualizarStatus` para ser
+ * reaproveitada por `listar`/`buscarPorId` (campo computado
+ * `elegibilidadeAtivacao`) sem duplicar mensagens/códigos de erro. Só avalia
+ * ciclos em rascunho; para os demais, `elegivel: false` sem motivo (não há
+ * transição de ativação a considerar).
+ */
+export function avaliarElegibilidadeAtivacao(
+  ciclo: CicloAvaliacao,
+  totalParticipantes: number,
+  pesquisaPublicada: Pesquisa | null,
+): ElegibilidadeAtivacao {
+  if (ciclo.status !== 'rascunho') {
+    return { elegivel: false, motivoBloqueio: null, codigoBloqueio: null }
+  }
+
+  if (totalParticipantes === 0) {
+    return {
+      elegivel: false,
+      motivoBloqueio: 'O ciclo precisa de pelo menos um participante para ser ativado.',
+      codigoBloqueio: 'CICLO_SEM_PARTICIPANTES',
+    }
+  }
+
+  if (!pesquisaPublicada) {
+    return {
+      elegivel: false,
+      motivoBloqueio: 'O ciclo precisa de uma pesquisa publicada vinculada para ser ativado.',
+      codigoBloqueio: 'CICLO_SEM_PESQUISA_PUBLICADA',
+    }
+  }
+
+  // Só se aplica a avaliacao_360 — clima_geral nunca gera
+  // relacionamentos_avaliacao, então este campo é irrelevante para ele.
+  if (pesquisaPublicada.tipo === 'avaliacao_360' && ciclo.tiposRelacionamentoGerados.length === 0) {
+    return {
+      elegivel: false,
+      motivoBloqueio: 'O ciclo precisa de pelo menos um tipo de relacionamento selecionado para ser ativado.',
+      codigoBloqueio: 'CICLO_SEM_TIPO_RELACIONAMENTO',
+    }
+  }
+
+  return { elegivel: true, motivoBloqueio: null, codigoBloqueio: null }
+}
+
+function calcularPercentual(total: number, concluidos: number): number {
+  return total === 0 ? 0 : Math.round((concluidos / total) * 100)
+}
+
+/**
+ * Progresso de conclusão de um ÚNICO ciclo (usado por `criar`/`atualizar`/
+ * `buscarPorId`/`atualizarStatus` — endpoints de ciclo isolado, sem risco de
+ * N+1). Para bulk (`listar`), a mesma lógica é replicada com queries
+ * agrupadas — ver comentário lá.
+ *
+ * `pesquisaVinculada` é a pesquisa do ciclo de QUALQUER status (usada só
+ * para descobrir o tipo avaliacao_360/clima_geral) — conceito diferente de
+ * "pesquisa publicada", que é o que `avaliarElegibilidadeAtivacao` precisa.
+ */
+async function calcularProgressoCiclo(
+  cicloId: string,
+  pesquisaVinculada: Pesquisa | null,
+): Promise<ProgressoCiclo> {
+  if (!pesquisaVinculada) return { total: 0, concluidos: 0, percentual: 0 }
+
+  if (pesquisaVinculada.tipo === 'avaliacao_360') {
+    const total = await AppDataSource.getRepository(RelacionamentoAvaliacao).count({
+      where: { cicloId },
+    })
+
+    // Contagem de relacionamentos com resposta registrada — SÓ CONTAGEM,
+    // nunca seleciona avaliador_id/avaliado_id/tipo_relacionamento (guard
+    // rail de anonimização, ver skill backend-anonimizacao-respostas).
+    const concluidos = await AppDataSource.getRepository(RelacionamentoAvaliacao)
+      .createQueryBuilder('r')
+      .innerJoin(EnvioPesquisa, 'envio', 'envio.relacionamento_id = r.id')
+      .innerJoin(Resposta, 'resposta', 'resposta.envio_id = envio.id')
+      .where('r.ciclo_id = :cicloId', { cicloId })
+      .getCount()
+
+    return { total, concluidos, percentual: calcularPercentual(total, concluidos) }
+  }
+
+  // clima_geral
+  const total = await AppDataSource.getRepository(CicloParticipante).count({ where: { cicloId } })
+  const concluidos = await AppDataSource.getRepository(CicloParticipante)
+    .createQueryBuilder('cp')
+    .where('cp.ciclo_id = :cicloId', { cicloId })
+    .andWhere('cp.respondeu_em IS NOT NULL')
+    .getCount()
+
+  return { total, concluidos, percentual: calcularPercentual(total, concluidos) }
+}
+
+/**
+ * Pesquisa vinculada ao ciclo, de QUALQUER status — usada só para descobrir o
+ * tipo (avaliacao_360/clima_geral) ao calcular progresso. Não há unique
+ * constraint em `pesquisas.ciclo_id`, então mais de uma pesquisa pode apontar
+ * para o mesmo ciclo — `order: { criadoEm: 'DESC' }` garante escolha
+ * determinística da mais recente. Compartilhado por `montarCicloResposta` e
+ * `buscarProgresso`.
+ */
+async function buscarPesquisaVinculada(cicloId: string): Promise<Pesquisa | null> {
+  return AppDataSource.getRepository(Pesquisa).findOne({
+    where: { cicloId },
+    order: { criadoEm: 'DESC' },
+  })
+}
+
+/**
+ * Monta a resposta completa (campos computados incluídos) de um ÚNICO
+ * ciclo — usado por `criar`/`atualizar`/`buscarPorId`/`atualizarStatus`.
+ */
+async function montarCicloResposta(ciclo: CicloAvaliacao): Promise<CicloResposta> {
+  let totalParticipantes = 0
+  let pesquisaPublicada: Pesquisa | null = null
+
+  // Só ciclos em rascunho podem ser elegíveis a ativar — evita query à toa
+  // para os demais (a função de elegibilidade nem olha esses parâmetros).
+  if (ciclo.status === 'rascunho') {
+    ;[totalParticipantes, pesquisaPublicada] = await Promise.all([
+      AppDataSource.getRepository(CicloParticipante).count({ where: { cicloId: ciclo.id } }),
+      AppDataSource.getRepository(Pesquisa).findOneBy({ cicloId: ciclo.id, status: 'publicada' }),
+    ])
+  }
+
+  const elegibilidadeAtivacao = avaliarElegibilidadeAtivacao(ciclo, totalParticipantes, pesquisaPublicada)
+
+  const pesquisaVinculada = await buscarPesquisaVinculada(ciclo.id)
+  const progresso = await calcularProgressoCiclo(ciclo.id, pesquisaVinculada)
+
+  return mapearCiclo(ciclo, elegibilidadeAtivacao, progresso)
+}
+
+function mapearCiclo(
+  ciclo: CicloAvaliacao,
+  elegibilidadeAtivacao: ElegibilidadeAtivacao,
+  progresso: ProgressoCiclo,
+): CicloResposta {
   return {
     id: ciclo.id,
     nome: ciclo.nome,
@@ -71,6 +230,8 @@ function mapearCiclo(ciclo: CicloAvaliacao): CicloResposta {
     anonimizarRespostasPares: ciclo.anonimizarRespostasPares,
     minimoRespostasPares: ciclo.minimoRespostasPares,
     tiposRelacionamentoGerados: ciclo.tiposRelacionamentoGerados,
+    elegibilidadeAtivacao,
+    progresso,
     criadoPor: ciclo.criadoPor,
     criadoEm: ciclo.criadoEm.toISOString(),
     atualizadoEm: ciclo.atualizadoEm.toISOString(),
@@ -179,7 +340,7 @@ export async function criar(
 
   const salvo = await repositorio().save(novo)
 
-  return mapearCiclo(salvo)
+  return montarCicloResposta(salvo)
 }
 
 export async function listar(ator: ColaboradorAutenticado): Promise<CicloResposta[]> {
@@ -187,7 +348,131 @@ export async function listar(ator: ColaboradorAutenticado): Promise<CicloRespost
 
   const ciclos = await repositorio().find({ order: { criadoEm: 'DESC' } })
 
-  return ciclos.map(mapearCiclo)
+  if (ciclos.length === 0) return []
+
+  const todosIds = ciclos.map((c) => c.id)
+  const idsRascunho = ciclos.filter((c) => c.status === 'rascunho').map((c) => c.id)
+
+  // --- Elegibilidade de ativação — só ciclos em rascunho precisam de dado
+  // real (os demais retornam elegivel:false direto, sem consultar os mapas).
+  const totalParticipantesPorCiclo = new Map<string, number>()
+  const pesquisaPublicadaPorCiclo = new Map<string, Pesquisa>()
+
+  if (idsRascunho.length > 0) {
+    const linhasParticipantes = await AppDataSource.getRepository(CicloParticipante)
+      .createQueryBuilder('cp')
+      .select('cp.ciclo_id', 'cicloId')
+      .addSelect('COUNT(*)', 'total')
+      .where('cp.ciclo_id IN (:...ids)', { ids: idsRascunho })
+      .groupBy('cp.ciclo_id')
+      .getRawMany<{ cicloId: string; total: string }>()
+
+    for (const linha of linhasParticipantes) {
+      totalParticipantesPorCiclo.set(linha.cicloId, Number(linha.total))
+    }
+
+    const pesquisasPublicadas = await AppDataSource.getRepository(Pesquisa).find({
+      where: { cicloId: In(idsRascunho), status: 'publicada' },
+    })
+
+    for (const pesquisa of pesquisasPublicadas) {
+      if (pesquisa.cicloId) pesquisaPublicadaPorCiclo.set(pesquisa.cicloId, pesquisa)
+    }
+  }
+
+  // --- Progresso — calculado para TODOS os ciclos, independente de status.
+  // Pesquisa vinculada de QUALQUER status (conceito diferente de
+  // `pesquisaPublicadaPorCiclo` acima, que é só para elegibilidade de
+  // ativação) — usada só para descobrir o tipo (avaliacao_360/clima_geral).
+  // Não há unique constraint em `pesquisas.ciclo_id`, então mais de uma
+  // pesquisa pode apontar para o mesmo ciclo — `order: { criadoEm: 'DESC' }`
+  // garante que a lista venha ordenada da mais recente para a mais antiga
+  // por ciclo; o "só sobrescreve se ainda não tiver essa chave" abaixo então
+  // mantém sempre a mais recente (mesmo critério do single-item em
+  // `montarCicloResposta`).
+  const pesquisasVinculadas = await AppDataSource.getRepository(Pesquisa).find({
+    where: { cicloId: In(todosIds) },
+    order: { criadoEm: 'DESC' },
+  })
+
+  const pesquisaVinculadaPorCiclo = new Map<string, Pesquisa>()
+  for (const pesquisa of pesquisasVinculadas) {
+    if (pesquisa.cicloId && !pesquisaVinculadaPorCiclo.has(pesquisa.cicloId)) {
+      pesquisaVinculadaPorCiclo.set(pesquisa.cicloId, pesquisa)
+    }
+  }
+
+  const idsAval360 = todosIds.filter((id) => pesquisaVinculadaPorCiclo.get(id)?.tipo === 'avaliacao_360')
+  const idsClima = todosIds.filter((id) => pesquisaVinculadaPorCiclo.get(id)?.tipo === 'clima_geral')
+
+  const progressoPorCiclo = new Map<string, ProgressoCiclo>()
+
+  if (idsAval360.length > 0) {
+    const totalPorCiclo = new Map<string, number>()
+    const concluidosPorCiclo = new Map<string, number>()
+
+    const linhasTotal = await AppDataSource.getRepository(RelacionamentoAvaliacao)
+      .createQueryBuilder('r')
+      .select('r.ciclo_id', 'cicloId')
+      .addSelect('COUNT(*)', 'total')
+      .where('r.ciclo_id IN (:...ids)', { ids: idsAval360 })
+      .groupBy('r.ciclo_id')
+      .getRawMany<{ cicloId: string; total: string }>()
+
+    for (const linha of linhasTotal) totalPorCiclo.set(linha.cicloId, Number(linha.total))
+
+    // Só contagem — nunca seleciona avaliador_id/avaliado_id/
+    // tipo_relacionamento (guard rail de anonimização, ver skill
+    // backend-anonimizacao-respostas).
+    const linhasConcluidos = await AppDataSource.getRepository(RelacionamentoAvaliacao)
+      .createQueryBuilder('r')
+      .innerJoin(EnvioPesquisa, 'envio', 'envio.relacionamento_id = r.id')
+      .innerJoin(Resposta, 'resposta', 'resposta.envio_id = envio.id')
+      .select('r.ciclo_id', 'cicloId')
+      .addSelect('COUNT(*)', 'total')
+      .where('r.ciclo_id IN (:...ids)', { ids: idsAval360 })
+      .groupBy('r.ciclo_id')
+      .getRawMany<{ cicloId: string; total: string }>()
+
+    for (const linha of linhasConcluidos) concluidosPorCiclo.set(linha.cicloId, Number(linha.total))
+
+    for (const id of idsAval360) {
+      const total = totalPorCiclo.get(id) ?? 0
+      const concluidos = concluidosPorCiclo.get(id) ?? 0
+      progressoPorCiclo.set(id, { total, concluidos, percentual: calcularPercentual(total, concluidos) })
+    }
+  }
+
+  if (idsClima.length > 0) {
+    const linhas = await AppDataSource.getRepository(CicloParticipante)
+      .createQueryBuilder('cp')
+      .select('cp.ciclo_id', 'cicloId')
+      .addSelect('COUNT(*)', 'total')
+      .addSelect('COUNT(cp.respondeu_em)', 'concluidos')
+      .where('cp.ciclo_id IN (:...ids)', { ids: idsClima })
+      .groupBy('cp.ciclo_id')
+      .getRawMany<{ cicloId: string; total: string; concluidos: string }>()
+
+    for (const linha of linhas) {
+      const total = Number(linha.total)
+      const concluidos = Number(linha.concluidos)
+      progressoPorCiclo.set(linha.cicloId, {
+        total,
+        concluidos,
+        percentual: calcularPercentual(total, concluidos),
+      })
+    }
+  }
+
+  return ciclos.map((ciclo) => {
+    const elegibilidadeAtivacao = avaliarElegibilidadeAtivacao(
+      ciclo,
+      totalParticipantesPorCiclo.get(ciclo.id) ?? 0,
+      pesquisaPublicadaPorCiclo.get(ciclo.id) ?? null,
+    )
+    const progresso = progressoPorCiclo.get(ciclo.id) ?? { total: 0, concluidos: 0, percentual: 0 }
+    return mapearCiclo(ciclo, elegibilidadeAtivacao, progresso)
+  })
 }
 
 export async function buscarPorId(
@@ -198,7 +483,26 @@ export async function buscarPorId(
 
   const ciclo = await buscarCicloOuFalhar(id)
 
-  return mapearCiclo(ciclo)
+  return montarCicloResposta(ciclo)
+}
+
+/**
+ * Versão leve de `buscarPorId` — só o progresso, para polling do frontend
+ * (ex.: a cada 30s) sem pagar o custo de montar `CicloResposta` completa
+ * (elegibilidade de ativação etc). Reaproveita `calcularProgressoCiclo`, a
+ * mesma função usada por `montarCicloResposta`/`listar()` — sem duplicar a
+ * lógica de contagem.
+ */
+export async function buscarProgresso(
+  ator: ColaboradorAutenticado,
+  id: string,
+): Promise<ProgressoCiclo> {
+  garantirPapel(ator, [...PAPEIS_COM_ACESSO])
+
+  await buscarCicloOuFalhar(id)
+
+  const pesquisaVinculada = await buscarPesquisaVinculada(id)
+  return calcularProgressoCiclo(id, pesquisaVinculada)
 }
 
 export async function atualizar(
@@ -256,7 +560,7 @@ export async function atualizar(
 
   const salvo = await repositorio().save(ciclo)
 
-  return mapearCiclo(salvo)
+  return montarCicloResposta(salvo)
 }
 
 export async function remover(ator: ColaboradorAutenticado, id: string): Promise<void> {
@@ -381,54 +685,36 @@ export async function atualizarStatus(
       where: { cicloId: ciclo.id },
     })
 
-    if (totalParticipantes === 0) {
-      throw new ErroHttp(
-        422,
-        'CICLO_SEM_PARTICIPANTES',
-        'O ciclo precisa de pelo menos um participante para ser ativado.',
-      )
-    }
-
     const pesquisaPublicada = await AppDataSource.getRepository(Pesquisa).findOneBy({
       cicloId: ciclo.id,
       status: 'publicada',
     })
 
-    if (!pesquisaPublicada) {
-      throw new ErroHttp(
-        422,
-        'CICLO_SEM_PESQUISA_PUBLICADA',
-        'O ciclo precisa de uma pesquisa publicada vinculada para ser ativado.',
-      )
+    const elegibilidade = avaliarElegibilidadeAtivacao(ciclo, totalParticipantes, pesquisaPublicada)
+    if (!elegibilidade.elegivel) {
+      throw new ErroHttp(422, elegibilidade.codigoBloqueio!, elegibilidade.motivoBloqueio!)
     }
 
-    // Só se aplica a avaliacao_360 — clima_geral nunca gera
-    // relacionamentos_avaliacao, então este campo é irrelevante para ele
-    // (guard rail de anonimização inalterado, ver seção 1.11 da task).
-    if (pesquisaPublicada.tipo === 'avaliacao_360' && ciclo.tiposRelacionamentoGerados.length === 0) {
-      throw new ErroHttp(
-        422,
-        'CICLO_SEM_TIPO_RELACIONAMENTO',
-        'O ciclo precisa de pelo menos um tipo de relacionamento selecionado para ser ativado.',
-      )
-    }
+    // pesquisaPublicada é garantidamente não-nulo aqui — do contrário
+    // `elegibilidade.elegivel` teria sido `false` acima.
+    const pesquisaAtiva = pesquisaPublicada!
 
     const salvo = await AppDataSource.transaction(async (manager) => {
-      if (pesquisaPublicada.tipo === 'avaliacao_360') {
+      if (pesquisaAtiva.tipo === 'avaliacao_360') {
         await gerarRelacionamentos(manager, ciclo.id, ciclo.tiposRelacionamentoGerados)
-        await gerarEnviosPesquisa(manager, ciclo.id, pesquisaPublicada.id)
+        await gerarEnviosPesquisa(manager, ciclo.id, pesquisaAtiva.id)
       } else {
         // clima_geral: NUNCA gera relacionamentos_avaliacao — guard rail de
         // anonimização (essa tabela é exclusiva do motor de avaliacao_360 e
         // da regra de pares/subordinado, que não existe para clima).
-        await gerarEnviosClima(manager, ciclo.id, pesquisaPublicada.id)
+        await gerarEnviosClima(manager, ciclo.id, pesquisaAtiva.id)
       }
 
       ciclo.status = novoStatus
       return manager.getRepository(CicloAvaliacao).save(ciclo)
     })
 
-    return mapearCiclo(salvo)
+    return montarCicloResposta(salvo)
   }
 
   // ativo → encerrado: sem pré-condição nesta task (envios_pesquisa/respostas
@@ -436,7 +722,7 @@ export async function atualizarStatus(
   ciclo.status = novoStatus
   const salvo = await repositorio().save(ciclo)
 
-  return mapearCiclo(salvo)
+  return montarCicloResposta(salvo)
 }
 
 export async function listarRelacionamentos(

@@ -48,12 +48,24 @@ export interface Pagina {
   perguntas: Pergunta[]
 }
 
+/**
+ * Espelha a regra completa de publicação já calculada pelo backend
+ * (`avaliarElegibilidadePublicacao`) — nunca recalcular client-side.
+ * `motivoBloqueio` só vem não-nulo quando `elegivel === false` e a pesquisa
+ * está em `rascunho`.
+ */
+export interface ElegibilidadePublicacao {
+  elegivel: boolean
+  motivoBloqueio: string | null
+}
+
 export interface PesquisaResumo {
   id: string
   titulo: string
   status: StatusPesquisa
   tipo: TipoPesquisa
   cicloId: string | null
+  elegibilidadePublicacao: ElegibilidadePublicacao
   criadoEm: string
   atualizadoEm: string
 }
@@ -68,6 +80,7 @@ export interface Pesquisa {
   tipo: TipoPesquisa
   cicloId: string | null
   paginas: Pagina[]
+  elegibilidadePublicacao: ElegibilidadePublicacao
   criadoEm: string
   atualizadoEm: string
 }

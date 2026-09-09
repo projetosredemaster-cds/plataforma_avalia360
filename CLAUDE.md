@@ -23,9 +23,19 @@ Plataforma de Avaliação 360° — uma plataforma single-tenant de avaliação 
   `module.ts` próprios) — gravados diretamente pelo service de `coleta-respostas-publica`.
   Só a ESCRITA (coleta) está implementada: `respostas`/`itens_resposta` (avaliação 360) são
   sempre gravados identificados via `envio_id`; `respostas_clima`/`itens_resposta_clima`
-  são estruturalmente anônimos (sem nenhuma FK de identidade). Módulo futuro/greenfield de
-  verdade: leitura/agregação dessas respostas (inclusive a regra de anonimização de
-  pares/subordinado descrita abaixo) — nenhum endpoint disso existe ainda.
+  são estruturalmente anônimos (sem nenhuma FK de identidade). Uma primeira fatia de
+  LEITURA agregada já existe, mas é propositalmente restrita a contagem: o módulo
+  `ciclos-avaliacao` expõe `progresso: { total, concluidos, percentual }` (calculado por
+  `calcularProgressoCiclo`/`buscarPesquisaVinculada` em `ciclos-avaliacao.service.ts`) em
+  `GET /api/ciclos`, `GET /api/ciclos/:id` e num endpoint dedicado e leve para polling,
+  `GET /api/ciclos/:id/progresso` — para avaliação 360, conta `relacionamentos_avaliacao`
+  com resposta registrada via `envios_pesquisa`→`respostas`; para `clima_geral`, conta
+  `ciclo_participantes.respondeu_em`. Sempre `COUNT`, nunca seleciona
+  `avaliador_id`/`avaliado_id`/`tipo_relacionamento` nem qualquer dado de
+  `itens_resposta`. Módulo futuro/greenfield de verdade continua sendo a leitura
+  IDENTIFICADA/agregada por competência e pergunta (inclusive a regra de anonimização de
+  pares/subordinado com o limiar de `minimo_respostas_pares` descrita abaixo) — nenhum
+  endpoint disso existe ainda.
 
 Os agentes/skills do próprio repositório (`.claude/agents/*.md`, `.claude/skills/**/*.md`)
 se referem a estes diretórios como `apps/web` e `apps/api` — essa nomenclatura não existe

@@ -48,3 +48,9 @@ export async function listarRelacionamentosCiclo(req: Request, res: Response): P
   )
   res.status(200).json(resposta)
 }
+
+export async function buscarProgressoCiclo(req: Request, res: Response): Promise<void> {
+  const id = obterParametroRota(req, 'id')
+  const resposta = await ciclosAvaliacaoService.buscarProgresso(req.colaboradorAutenticado!, id)
+  res.status(200).json(resposta)
+}

@@ -33,12 +33,40 @@ const TRANSICOES_VALIDAS: Record<StatusPesquisa, StatusPesquisa[]> = {
   encerrada: [],
 }
 
+export interface ElegibilidadePublicacao {
+  elegivel: boolean
+  motivoBloqueio: string | null
+}
+
+/**
+ * Regra pura de "pode publicar" — extraída de `atualizarStatus` para ser
+ * reaproveitada por `listar`/`montarDetalhe` (campo computado
+ * `elegibilidadePublicacao`) sem duplicar a mensagem de erro. Só avalia
+ * pesquisas em rascunho; para as demais, `elegivel: false` sem motivo (não
+ * há transição de publicação a considerar).
+ */
+export function avaliarElegibilidadePublicacao(
+  pesquisa: Pesquisa,
+  totalPerguntas: number,
+): ElegibilidadePublicacao {
+  if (pesquisa.status !== 'rascunho') return { elegivel: false, motivoBloqueio: null }
+  if (totalPerguntas === 0) {
+    return {
+      elegivel: false,
+      motivoBloqueio:
+        'A pesquisa precisa de pelo menos uma página com pelo menos uma pergunta para ser publicada.',
+    }
+  }
+  return { elegivel: true, motivoBloqueio: null }
+}
+
 export interface PesquisaRespostaLista {
   id: string
   titulo: string
   status: StatusPesquisa
   tipo: TipoPesquisa
   cicloId: string | null
+  elegibilidadePublicacao: ElegibilidadePublicacao
   criadoEm: string
   atualizadoEm: string
 }
@@ -73,6 +101,7 @@ export interface PesquisaRespostaDetalhe {
   status: StatusPesquisa
   tipo: TipoPesquisa
   cicloId: string | null
+  elegibilidadePublicacao: ElegibilidadePublicacao
   paginas: PaginaAninhada[]
   criadoEm: string
   atualizadoEm: string
@@ -102,13 +131,14 @@ async function validarCicloExistente(valor: unknown): Promise<CicloAvaliacao> {
   return ciclo
 }
 
-function mapearPesquisaLista(pesquisa: Pesquisa): PesquisaRespostaLista {
+function mapearPesquisaLista(pesquisa: Pesquisa, totalPerguntas: number): PesquisaRespostaLista {
   return {
     id: pesquisa.id,
     titulo: pesquisa.titulo,
     status: pesquisa.status,
     tipo: pesquisa.tipo,
     cicloId: pesquisa.cicloId,
+    elegibilidadePublicacao: avaliarElegibilidadePublicacao(pesquisa, totalPerguntas),
     criadoEm: pesquisa.criadoEm.toISOString(),
     atualizadoEm: pesquisa.atualizadoEm.toISOString(),
   }
@@ -173,6 +203,7 @@ async function montarDetalhe(
     status: pesquisa.status,
     tipo: pesquisa.tipo,
     cicloId: pesquisa.cicloId,
+    elegibilidadePublicacao: avaliarElegibilidadePublicacao(pesquisa, perguntas.length),
     paginas: paginas.map((pagina) => ({
       id: pagina.id,
       titulo: pagina.titulo,
@@ -245,7 +276,29 @@ export async function listar(ator: ColaboradorAutenticado): Promise<PesquisaResp
 
   const pesquisas = await repositorio().find({ order: { criadoEm: 'DESC' } })
 
-  return pesquisas.map(mapearPesquisaLista)
+  // Só pesquisas em rascunho podem ser elegíveis a publicar — as demais
+  // recebem `elegivel: false` sem precisar de contagem (evita query à toa).
+  const idsRascunho = pesquisas.filter((p) => p.status === 'rascunho').map((p) => p.id)
+
+  const totalPerguntasPorPesquisa = new Map<string, number>()
+  if (idsRascunho.length > 0) {
+    const linhas = await AppDataSource.getRepository(Pergunta)
+      .createQueryBuilder('pergunta')
+      .innerJoin(PaginaPesquisa, 'pagina', 'pagina.id = pergunta.pagina_id')
+      .select('pagina.pesquisa_id', 'pesquisaId')
+      .addSelect('COUNT(*)', 'total')
+      .where('pagina.pesquisa_id IN (:...ids)', { ids: idsRascunho })
+      .groupBy('pagina.pesquisa_id')
+      .getRawMany<{ pesquisaId: string; total: string }>()
+
+    for (const linha of linhas) {
+      totalPerguntasPorPesquisa.set(linha.pesquisaId, Number(linha.total))
+    }
+  }
+
+  return pesquisas.map((pesquisa) =>
+    mapearPesquisaLista(pesquisa, totalPerguntasPorPesquisa.get(pesquisa.id) ?? 0),
+  )
 }
 
 export async function buscarPorId(
@@ -366,12 +419,9 @@ export async function atualizarStatus(
       .where('pagina.pesquisa_id = :pesquisaId', { pesquisaId: pesquisa.id })
       .getCount()
 
-    if (totalPerguntas === 0) {
-      throw new ErroHttp(
-        422,
-        'PESQUISA_VAZIA',
-        'A pesquisa precisa de pelo menos uma página com pelo menos uma pergunta para ser publicada.',
-      )
+    const resultado = avaliarElegibilidadePublicacao(pesquisa, totalPerguntas)
+    if (!resultado.elegivel) {
+      throw new ErroHttp(422, 'PESQUISA_VAZIA', resultado.motivoBloqueio!)
     }
   }
 

@@ -7,6 +7,7 @@ import {
   atualizarCiclo,
   atualizarStatusCiclo,
   buscarCicloPorId,
+  buscarProgressoCiclo,
   criarCiclo,
   listarCiclos,
   listarRelacionamentosCiclo,
@@ -29,5 +30,6 @@ router.put('/:id', asyncHandler(atualizarCiclo))
 router.delete('/:id', asyncHandler(removerCiclo))
 router.patch('/:id/status', asyncHandler(atualizarStatusCiclo))
 router.get('/:id/relacionamentos', asyncHandler(listarRelacionamentosCiclo))
+router.get('/:id/progresso', asyncHandler(buscarProgressoCiclo))
 
 export { router as ciclosAvaliacaoRouter }
