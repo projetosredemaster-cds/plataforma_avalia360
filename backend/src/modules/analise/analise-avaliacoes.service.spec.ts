@@ -478,6 +478,231 @@ describe('analise-avaliacoes.service — buscarAvaliacoes', () => {
     })
   })
 
+  describe('nomeCiclo — metadado de grupo/item novo, presente em liberado e bloqueado, sem troca entre ciclos', () => {
+    it('identificadas: nomeCiclo bate com o nome do CicloAvaliacao correspondente, sem troca entre múltiplos ciclos no mesmo resultado', async () => {
+      const periodoConsulta = { de: '2026-01-01', ate: '2026-01-31' }
+      const cicloAlpha = criarCicloAvaliacaoFixture({
+        nome: 'Ciclo Alpha 2026.1',
+        dataInicio: '2026-01-01',
+        dataFim: '2026-01-31',
+      })
+      const cicloBeta = criarCicloAvaliacaoFixture({
+        nome: 'Ciclo Beta 2026.1',
+        dataInicio: '2026-01-01',
+        dataFim: '2026-01-31',
+      })
+      repos.ciclosRepo.semear([cicloAlpha, cicloBeta])
+      repos.pesquisasRepo.semear([
+        criarPesquisaFixture({ tipo: 'avaliacao_360', cicloId: cicloAlpha.id }),
+        criarPesquisaFixture({ tipo: 'avaliacao_360', cicloId: cicloBeta.id }),
+      ])
+
+      const pergunta = criarPerguntaFixture()
+      repos.perguntasRepo.semear([pergunta])
+
+      for (const ciclo of [cicloAlpha, cicloBeta]) {
+        const rel = criarRelacionamentoFixture({ cicloId: ciclo.id, tipoRelacionamento: 'autoavaliacao' })
+        const envio = criarEnvioPesquisaFixture({ relacionamentoId: rel.id })
+        const resposta = criarRespostaFixture({ envioId: envio.id, respondidoEm: new Date('2026-01-10T00:00:00Z') })
+        const item = criarItemRespostaFixture({
+          respostaId: resposta.id,
+          perguntaId: pergunta.id,
+          valor: { texto: `Texto autoavaliação ${ciclo.nome}` },
+        })
+        repos.relacionamentosRepo.semear([...repos.relacionamentosRepo.todas(), rel])
+        repos.enviosRepo.semear([...repos.enviosRepo.todas(), envio])
+        repos.respostasRepo.semear([...repos.respostasRepo.todas(), resposta])
+        repos.itensRespostaRepo.semear([...repos.itensRespostaRepo.todas(), item])
+        repos.colaboradoresRepo.semear([
+          ...repos.colaboradoresRepo.todas(),
+          criarColaboradorFixture({ id: rel.avaliadoId }),
+          criarColaboradorFixture({ id: rel.avaliadorId }),
+        ])
+      }
+
+      const resultado = await analiseAvaliacoesService.buscarAvaliacoes(admin, periodoConsulta)
+
+      expect(resultado.avaliacao360.identificadas).toHaveLength(2)
+      const itemAlpha = resultado.avaliacao360.identificadas.find((i) => i.cicloId === cicloAlpha.id)!
+      const itemBeta = resultado.avaliacao360.identificadas.find((i) => i.cicloId === cicloBeta.id)!
+      expect(itemAlpha.nomeCiclo).toBe('Ciclo Alpha 2026.1')
+      expect(itemBeta.nomeCiclo).toBe('Ciclo Beta 2026.1')
+
+      // Shape completo de AvaliacaoIdentificada — nomeCiclo é campo
+      // documentado, não um extra acidental nem um campo faltando.
+      expect(Object.keys(itemAlpha).sort()).toEqual(
+        [
+          'tipoRelacionamento',
+          'cicloId',
+          'nomeCiclo',
+          'avaliadoId',
+          'avaliadoNome',
+          'avaliadorId',
+          'avaliadorNome',
+          'perguntaId',
+          'perguntaEnunciado',
+          'texto',
+        ].sort(),
+      )
+    })
+
+    it('paresSubordinado: nomeCiclo presente e correto tanto em liberado:true quanto liberado:false, sem troca entre ciclos diferentes', async () => {
+      const periodoConsulta = { de: '2026-01-01', ate: '2026-01-31' }
+      const cicloBloqueado = criarCicloAvaliacaoFixture({
+        nome: 'Ciclo Bloqueado',
+        dataInicio: '2026-01-01',
+        dataFim: '2026-01-31',
+        minimoRespostasPares: 3,
+      })
+      const cicloLiberado = criarCicloAvaliacaoFixture({
+        nome: 'Ciclo Liberado',
+        dataInicio: '2026-01-01',
+        dataFim: '2026-01-31',
+        minimoRespostasPares: 3,
+      })
+      repos.ciclosRepo.semear([cicloBloqueado, cicloLiberado])
+      repos.pesquisasRepo.semear([
+        criarPesquisaFixture({ tipo: 'avaliacao_360', cicloId: cicloBloqueado.id }),
+        criarPesquisaFixture({ tipo: 'avaliacao_360', cicloId: cicloLiberado.id }),
+      ])
+
+      semearGrupoParesSubordinado(repos, {
+        cicloId: cicloBloqueado.id,
+        tipoRelacionamento: 'pares',
+        quantidade: 2, // abaixo do mínimo de 3
+        respondidoEm: new Date('2026-01-10T00:00:00Z'),
+      })
+      semearGrupoParesSubordinado(repos, {
+        cicloId: cicloLiberado.id,
+        tipoRelacionamento: 'pares',
+        quantidade: 4, // acima do mínimo de 3
+        respondidoEm: new Date('2026-01-10T00:00:00Z'),
+      })
+
+      const resultado = await analiseAvaliacoesService.buscarAvaliacoes(admin, periodoConsulta)
+
+      expect(resultado.avaliacao360.paresSubordinado).toHaveLength(2)
+      const grupoBloqueado = resultado.avaliacao360.paresSubordinado.find((g) => g.cicloId === cicloBloqueado.id)!
+      const grupoLiberado = resultado.avaliacao360.paresSubordinado.find((g) => g.cicloId === cicloLiberado.id)!
+
+      // Presença + correção do campo, SEM troca entre ciclos.
+      expect(grupoBloqueado.liberado).toBe(false)
+      expect(grupoBloqueado.nomeCiclo).toBe('Ciclo Bloqueado')
+      expect(grupoBloqueado).not.toHaveProperty('textos')
+
+      expect(grupoLiberado.liberado).toBe(true)
+      expect(grupoLiberado.nomeCiclo).toBe('Ciclo Liberado')
+      expect(grupoLiberado.textos).toHaveLength(4)
+
+      // nomeCiclo NÃO fica preso ao branch condicional de liberado — presente
+      // no shape completo tanto no estado bloqueado quanto no liberado.
+      expect(Object.keys(grupoBloqueado).sort()).toEqual(
+        [
+          'cicloId',
+          'nomeCiclo',
+          'avaliadoId',
+          'avaliadoNome',
+          'tipoRelacionamento',
+          'totalRespondentes',
+          'minimoNecessario',
+          'liberado',
+          'motivo',
+        ].sort(),
+      )
+      expect(Object.keys(grupoLiberado).sort()).toEqual(
+        [
+          'cicloId',
+          'nomeCiclo',
+          'avaliadoId',
+          'avaliadoNome',
+          'tipoRelacionamento',
+          'totalRespondentes',
+          'minimoNecessario',
+          'liberado',
+          'textos',
+        ].sort(),
+      )
+
+      // REFORÇO do guard rail crítico nº 2: mesmo com nomeCiclo adicionado,
+      // nenhum grupo pares/subordinado (liberado OU bloqueado) expõe
+      // identidade de avaliador.
+      for (const grupo of [grupoBloqueado, grupoLiberado]) {
+        const chaves = new Set<string>()
+        coletarChaves(grupo, chaves)
+        for (const proibido of ['avaliadorId', 'avaliador_id', 'avaliadorNome', 'avaliador']) {
+          expect(chaves.has(proibido)).toBe(false)
+        }
+      }
+    })
+
+    it('climaGeral: nomeCiclo presente e correto tanto em liberado:true quanto liberado:false, sem troca entre ciclos diferentes', async () => {
+      const periodoConsulta = { de: '2026-02-01', ate: '2026-02-28' }
+      const cicloBloqueado = criarCicloAvaliacaoFixture({
+        nome: 'Clima Bloqueado',
+        dataInicio: '2026-02-01',
+        dataFim: '2026-02-28',
+        minimoRespostasPares: 3,
+      })
+      const cicloLiberado = criarCicloAvaliacaoFixture({
+        nome: 'Clima Liberado',
+        dataInicio: '2026-02-01',
+        dataFim: '2026-02-28',
+        minimoRespostasPares: 3,
+      })
+      repos.ciclosRepo.semear([cicloBloqueado, cicloLiberado])
+      repos.pesquisasRepo.semear([
+        criarPesquisaFixture({ tipo: 'clima_geral', cicloId: cicloBloqueado.id }),
+        criarPesquisaFixture({ tipo: 'clima_geral', cicloId: cicloLiberado.id }),
+      ])
+
+      const perguntaClima = criarPerguntaFixture({ enunciado: 'Como você avalia o clima?' })
+      repos.perguntasRepo.semear([perguntaClima])
+
+      const respostasBloqueadas = Array.from({ length: 2 }, () =>
+        criarRespostaClimaFixture({ cicloId: cicloBloqueado.id, respondidoEm: new Date('2026-02-10T00:00:00Z') }),
+      )
+      const itensBloqueados = respostasBloqueadas.map((r) =>
+        criarItemRespostaClimaFixture({ respostaClimaId: r.id, perguntaId: perguntaClima.id, valor: { texto: 'Bloqueado' } }),
+      )
+      const respostasLiberadas = Array.from({ length: 3 }, () =>
+        criarRespostaClimaFixture({ cicloId: cicloLiberado.id, respondidoEm: new Date('2026-02-15T00:00:00Z') }),
+      )
+      const itensLiberados = respostasLiberadas.map((r, i) =>
+        criarItemRespostaClimaFixture({
+          respostaClimaId: r.id,
+          perguntaId: perguntaClima.id,
+          valor: { texto: `Texto clima liberado #${i + 1}` },
+        }),
+      )
+
+      repos.respostasClimaRepo.semear([...respostasBloqueadas, ...respostasLiberadas])
+      repos.itensRespostaClimaRepo.semear([...itensBloqueados, ...itensLiberados])
+
+      const resultado = await analiseAvaliacoesService.buscarAvaliacoes(admin, periodoConsulta)
+
+      expect(resultado.climaGeral).toHaveLength(2)
+      const grupoBloqueado = resultado.climaGeral.find((g) => g.cicloId === cicloBloqueado.id)!
+      const grupoLiberado = resultado.climaGeral.find((g) => g.cicloId === cicloLiberado.id)!
+
+      expect(grupoBloqueado.liberado).toBe(false)
+      expect(grupoBloqueado.nomeCiclo).toBe('Clima Bloqueado')
+      expect(grupoBloqueado).not.toHaveProperty('textos')
+
+      expect(grupoLiberado.liberado).toBe(true)
+      expect(grupoLiberado.nomeCiclo).toBe('Clima Liberado')
+      expect(grupoLiberado.textos).toHaveLength(3)
+
+      // nomeCiclo presente no shape completo tanto bloqueado quanto liberado.
+      expect(Object.keys(grupoBloqueado).sort()).toEqual(
+        ['cicloId', 'nomeCiclo', 'totalRespondentes', 'minimoNecessario', 'liberado', 'motivo'].sort(),
+      )
+      expect(Object.keys(grupoLiberado).sort()).toEqual(
+        ['cicloId', 'nomeCiclo', 'totalRespondentes', 'minimoNecessario', 'liberado', 'textos'].sort(),
+      )
+    })
+
+  })
+
   describe('corte de período aplicado também ao GATE, não só aos textos', () => {
     it('grupo com respondentes suficientes somando TODO o histórico do ciclo, mas insuficientes DENTRO do período filtrado → gate usa a contagem do período, fica liberado:false', async () => {
       const ciclo = criarCicloAvaliacaoFixture({

@@ -1,42 +1,25 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Chip, Paper, Skeleton, TextField, Typography } from '@mui/material'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { Alert, Button, Paper, Skeleton, TextField, Typography } from '@mui/material'
 import { useSearchParams } from 'react-router-dom'
 import { MetricaCard } from '../../components/analise/MetricaCard/MetricaCard'
+import { SeletorCiclo } from '../../components/analise/SeletorCiclo/SeletorCiclo'
 import { ApiError } from '../../lib/apiClient'
-import { buscarCiclo } from '../../services/ciclosService'
 import { buscarVisaoGeralAnalise } from '../../services/analiseService'
 import type { VisaoGeralAnalise } from '../../types/analise'
 import { formatarHoras, formatarInteiro, formatarPercentual, hojeYMD, inicioAnoCorrenteYMD } from './formatadores'
 
-/**
- * Painel de métricas agregadas (Visão Geral do módulo Análise). Todo número
- * exibido vem literalmente do payload de `GET /api/analise/visao-geral` —
- * nenhum cálculo de agregação/anonimização é refeito aqui (a única
- * "matemática" client-side é conversão de unidade horas→dias em
- * `formatarHoras`). `admin`/`gestor_rh` veem exatamente a mesma tela, sem
- * nenhuma renderização condicional por papel (a única checagem de papel é
- * `RotaProtegida`, no nível de rota).
- */
 export function AnaliseVisaoGeralPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [de, setDe] = useState(() => inicioAnoCorrenteYMD())
   const [ate, setAte] = useState(() => hojeYMD())
   const [cicloId, setCicloId] = useState<string | null>(() => searchParams.get('cicloId'))
-  const [nomeCiclo, setNomeCiclo] = useState<string | null>(null)
 
   const [dados, setDados] = useState<VisaoGeralAnalise | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
 
   const periodoInvalido = ate < de
-
-  /**
-   * Aceita overrides opcionais para permitir disparar a busca com um valor
-   * de `cicloId` que ainda não foi refletido no state (evita depender do
-   * timing de `setState`/re-render, ex.: no fluxo de "Remover filtro de
-   * ciclo", que precisa buscar com `cicloId: null` imediatamente).
-   */
   const executarBusca = useCallback(
     async (overrides?: { cicloId?: string | null }) => {
       const cicloIdAtual = overrides?.cicloId !== undefined ? overrides.cicloId : cicloId
@@ -62,59 +45,35 @@ export function AnaliseVisaoGeralPage() {
   )
 
   useEffect(() => {
-    // Carga inicial da visão geral via API — não é dado derivável durante a renderização.
+    // Carga inicial via API — não é dado derivável durante a renderização.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     executarBusca()
+    // Fetch intencionalmente só-no-mount: `executarBusca` muda a cada tecla em
+    // "De"/"Até"/troca de ciclo, incluí-la no array de deps repetiria a busca a
+    // cada edição do formulário.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    if (!cicloId) return
-    let cancelado = false
-    buscarCiclo(cicloId)
-      .then((ciclo) => {
-        if (!cancelado) setNomeCiclo(ciclo.nome)
-      })
-      .catch(() => {
-        // Best-effort — falha aqui nunca vira o `erro` principal da página
-        // nem bloqueia a busca de `buscarVisaoGeralAnalise`; cai para exibir
-        // o uuid cru no chip.
-      })
-    return () => {
-      cancelado = true
-    }
-  }, [cicloId])
-
-  function handleSubmit(event: React.FormEvent) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     executarBusca()
   }
 
-  function handleRemoverFiltroCiclo() {
-    setCicloId(null)
-    setNomeCiclo(null)
-    setSearchParams({}, { replace: true })
-    executarBusca({ cicloId: null })
+  function handleCicloChange(novoCicloId: string | null) {
+    setCicloId(novoCicloId)
+    setSearchParams(novoCicloId ? { cicloId: novoCicloId } : {}, { replace: true })
+    executarBusca({ cicloId: novoCicloId })
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Typography variant="h5" component="h1">
-            Visão Geral
-          </Typography>
-          {cicloId && (
-            <Chip
-              label={`Filtrado por ciclo: ${nomeCiclo ?? cicloId}`}
-              onDelete={handleRemoverFiltroCiclo}
-              size="small"
-            />
-          )}
-        </div>
+        <Typography variant="h5" component="h1">
+          Visão Geral
+        </Typography>
       </div>
 
-      <Paper component="form" onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 p-4">
+      <Paper component="form" onSubmit={handleSubmit} className="flex flex-wrap items-center gap-3 p-4">
         <TextField
           label="De"
           type="date"
@@ -130,9 +89,20 @@ export function AnaliseVisaoGeralPage() {
           value={ate}
           onChange={(e) => setAte(e.target.value)}
           error={periodoInvalido}
-          helperText={periodoInvalido ? 'A data final não pode ser anterior à data inicial.' : ' '}
-          slotProps={{ inputLabel: { shrink: true } }}
+          helperText={periodoInvalido ? 'A data final não pode ser anterior à data inicial.' : undefined}
+          slotProps={{ 
+            inputLabel: { shrink: true },
+            formHelperText: {
+              sx: {
+                position: 'absolute',
+                bottom: -20,
+                left: 0,
+                whiteSpace: 'nowrap',
+              },
+            },
+          }}
         />
+        <SeletorCiclo cicloId={cicloId} onChange={handleCicloChange} />
         <Button type="submit" variant="contained" disabled={periodoInvalido || carregando}>
           Aplicar filtro
         </Button>

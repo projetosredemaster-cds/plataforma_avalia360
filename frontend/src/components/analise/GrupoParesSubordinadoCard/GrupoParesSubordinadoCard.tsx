@@ -18,7 +18,7 @@ export function GrupoParesSubordinadoCard({ grupo }: GrupoParesSubordinadoCardPr
   return (
     <Paper variant="outlined" className="flex flex-col gap-2 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Typography variant="body2">
+        <Typography variant="body2" sx={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
           <strong>{grupo.avaliadoNome}</strong>
         </Typography>
         <Chip size="small" label={rotuloTipoRelacionamento(grupo.tipoRelacionamento)} />

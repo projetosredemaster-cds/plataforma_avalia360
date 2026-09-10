@@ -5,27 +5,58 @@ interface TextoAbertoListaProps {
   textos: TextoAbertoItem[]
 }
 
+interface GrupoPerguntaTexto {
+  perguntaId: string
+  perguntaEnunciado: string
+  textos: TextoAbertoItem[]
+}
+
 /**
- * Lista solta de textos de perguntas `texto_aberto`, SEM numeração/rótulo de
- * posição — a ordem já vem embaralhada do backend a cada chamada, nunca
- * reordenar aqui (nenhum `.sort()`/`.reverse()`) — e SEM qualquer atribuição
- * de autoria por item; quem chama decide se/como identificar o GRUPO
- * (avaliado, ciclo), nunca o texto individual.
+ * Agrupa POR PERGUNTA os textos de UM ÚNICO grupo (avaliado+ciclo+tipo, ou o único
+ * grupo de clima do ciclo) recebido via prop — nunca funde `textos` de grupos
+ * diferentes (quem chama já passa só um `grupo.textos` por vez). Bucket via `Map`,
+ * preserva a ordem de inserção — a ordem das perguntas é a ordem da primeira
+ * ocorrência no array já embaralhado pelo backend; a ordem dos textos DENTRO de
+ * cada pergunta é exatamente a do array recebido. Nenhum `.sort()`/`.reverse()`.
+ */
+function agruparPorPergunta(textos: TextoAbertoItem[]): GrupoPerguntaTexto[] {
+  const mapa = new Map<string, GrupoPerguntaTexto>()
+  for (const item of textos) {
+    let bucket = mapa.get(item.perguntaId)
+    if (!bucket) {
+      bucket = { perguntaId: item.perguntaId, perguntaEnunciado: item.perguntaEnunciado, textos: [] }
+      mapa.set(item.perguntaId, bucket)
+    }
+    bucket.textos.push(item)
+  }
+  return Array.from(mapa.values())
+}
+
+/**
+ * Lista de textos de UM grupo, agrupada por pergunta (cabeçalho uma única vez),
+ * SEM numeração/rótulo de posição em nenhum texto individual e SEM qualquer
+ * atribuição de autoria — quem chama decide se/como identificar o GRUPO (avaliado,
+ * ciclo), nunca o texto individual.
  */
 export function TextoAbertoLista({ textos }: TextoAbertoListaProps) {
+  const grupos = agruparPorPergunta(textos)
   return (
-    <div className="flex flex-col gap-2">
-      {textos.map((item, indice) => (
-        // key por índice + perguntaId: TextoAbertoItem não tem id próprio (a
-        // mesma pergunta pode se repetir entre textos de respondentes
-        // diferentes) e a ordem do array não é estável entre carregamentos —
-        // é só um identificador técnico de lista, nunca exibido na UI.
-        <Paper key={`${item.perguntaId}-${indice}`} variant="outlined" className="flex flex-col gap-1 p-3">
-          <Typography variant="caption" color="text.secondary">
-            {item.perguntaEnunciado}
+    <div className="flex flex-col gap-4">
+      {grupos.map((grupo) => (
+        <div key={grupo.perguntaId} className="flex flex-col gap-2">
+          <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+            {grupo.perguntaEnunciado}
           </Typography>
-          <Typography variant="body2">{item.texto}</Typography>
-        </Paper>
+          <div className="flex flex-col gap-2">
+            {grupo.textos.map((item, indice) => (
+              <Paper key={`${item.perguntaId}-${indice}`} variant="outlined" className="p-3">
+                <Typography variant="body2" sx={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                  {item.texto}
+                </Typography>
+              </Paper>
+            ))}
+          </div>
+        </div>
       ))}
     </div>
   )

@@ -1,50 +1,39 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Alert, Button, Chip, Paper, Skeleton, TextField, Typography } from '@mui/material'
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Alert,
+  Button,
+  Paper,
+  Skeleton,
+  TextField,
+  Typography,
+} from '@mui/material'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { useSearchParams } from 'react-router-dom'
 import { AvaliacaoIdentificadaCard } from '../../components/analise/AvaliacaoIdentificadaCard/AvaliacaoIdentificadaCard'
 import { AvisoLimitacaoAnonimizacao } from '../../components/analise/AvisoLimitacaoAnonimizacao/AvisoLimitacaoAnonimizacao'
 import { GrupoClimaCard } from '../../components/analise/GrupoClimaCard/GrupoClimaCard'
 import { GrupoParesSubordinadoCard } from '../../components/analise/GrupoParesSubordinadoCard/GrupoParesSubordinadoCard'
+import { SeletorCiclo } from '../../components/analise/SeletorCiclo/SeletorCiclo'
 import { ApiError } from '../../lib/apiClient'
-import { buscarCiclo } from '../../services/ciclosService'
 import { buscarAvaliacoesAnalise } from '../../services/analiseService'
-import type { AvaliacaoIdentificada, AvaliacoesAnalise, TipoRelacionamentoIdentificado } from '../../types/analise'
+import type { AvaliacoesAnalise } from '../../types/analise'
+import { agruparIdentificadasPorPergunta, agruparPorCiclo } from './agrupamento'
 import { hojeYMD, inicioAnoCorrenteYMD } from './formatadores'
 
-const SECOES_IDENTIFICADAS: { tipo: TipoRelacionamentoIdentificado; titulo: string }[] = [
-  { tipo: 'autoavaliacao', titulo: 'Autoavaliação' },
-  { tipo: 'gestor', titulo: 'Gestor' },
-  { tipo: 'externo', titulo: 'Externo' },
-]
-
-function agruparPorTipo(itens: AvaliacaoIdentificada[]): Record<TipoRelacionamentoIdentificado, AvaliacaoIdentificada[]> {
-  return {
-    autoavaliacao: itens.filter((i) => i.tipoRelacionamento === 'autoavaliacao'),
-    gestor: itens.filter((i) => i.tipoRelacionamento === 'gestor'),
-    externo: itens.filter((i) => i.tipoRelacionamento === 'externo'),
-  }
-}
-
-/**
- * Lista de respostas individuais de perguntas `texto_aberto` (avaliação 360 +
- * clima organizacional). `autoavaliacao`/`gestor`/`externo` saem sempre
- * identificados (sem terceiro a proteger). `pares`/`subordinado`/clima só
- * saem quando o grupo atinge `minimoNecessario` respondentes — ESTE LIMIAR
- * NÃO TEM BYPASS PARA NENHUM PAPEL, nem admin/gestor_rh (spec, seção 2).
- * Todo estado liberado/bloqueado, a ordem dos textos e a presença/ausência de
- * identidade já vêm prontos da API — esta página só formata/exibe.
- */
 export function AnaliseAvaliacoesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [de, setDe] = useState(() => inicioAnoCorrenteYMD())
   const [ate, setAte] = useState(() => hojeYMD())
   const [cicloId, setCicloId] = useState<string | null>(() => searchParams.get('cicloId'))
-  const [nomeCiclo, setNomeCiclo] = useState<string | null>(null)
 
   const [dados, setDados] = useState<AvaliacoesAnalise | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [resultadoVersao, setResultadoVersao] = useState(0)
 
   const periodoInvalido = ate < de
 
@@ -59,6 +48,7 @@ export function AnaliseAvaliacoesPage() {
       try {
         const resultado = await buscarAvaliacoesAnalise({ de, ate, cicloId: cicloIdAtual ?? undefined })
         setDados(resultado)
+        setResultadoVersao((v) => v + 1)
       } catch (err) {
         if (err instanceof ApiError && err.codigo === 'CICLO_NAO_ENCONTRADO') {
           setErro('O ciclo filtrado não foi encontrado. Remova o filtro de ciclo e tente novamente.')
@@ -76,41 +66,24 @@ export function AnaliseAvaliacoesPage() {
     // Carga inicial via API — não é dado derivável durante a renderização.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     executarBusca()
+    // Fetch intencionalmente só-no-mount: `executarBusca` muda a cada tecla em
+    // "De"/"Até"/troca de ciclo, incluí-la no array de deps repetiria a busca a
+    // cada edição do formulário.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    if (!cicloId) return
-    let cancelado = false
-    buscarCiclo(cicloId)
-      .then((ciclo) => {
-        if (!cancelado) setNomeCiclo(ciclo.nome)
-      })
-      .catch(() => {
-        // Best-effort — falha aqui nunca vira o `erro` principal da página,
-        // mesmo padrão de AnaliseVisaoGeralPage.
-      })
-    return () => {
-      cancelado = true
-    }
-  }, [cicloId])
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     executarBusca()
   }
 
-  function handleRemoverFiltroCiclo() {
-    setCicloId(null)
-    setNomeCiclo(null)
-    setSearchParams({}, { replace: true })
-    executarBusca({ cicloId: null })
+  function handleCicloChange(novoCicloId: string | null) {
+    setCicloId(novoCicloId)
+    setSearchParams(novoCicloId ? { cicloId: novoCicloId } : {}, { replace: true })
+    executarBusca({ cicloId: novoCicloId })
   }
 
-  const identificadasPorTipo = useMemo(
-    () => (dados ? agruparPorTipo(dados.avaliacao360.identificadas) : null),
-    [dados],
-  )
+  const gruposPorCiclo = useMemo(() => (dados ? agruparPorCiclo(dados) : []), [dados])
 
   const vazio =
     !!dados &&
@@ -125,21 +98,12 @@ export function AnaliseAvaliacoesPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Typography variant="h5" component="h1">
-            Avaliações
-          </Typography>
-          {cicloId && (
-            <Chip
-              label={`Filtrado por ciclo: ${nomeCiclo ?? cicloId}`}
-              onDelete={handleRemoverFiltroCiclo}
-              size="small"
-            />
-          )}
-        </div>
+        <Typography variant="h5" component="h1">
+          Avaliações
+        </Typography>
       </div>
 
-      <Paper component="form" onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 p-4">
+      <Paper component="form" onSubmit={handleSubmit} className="flex flex-wrap items-center gap-3 p-4">
         <TextField
           label="De"
           type="date"
@@ -156,8 +120,19 @@ export function AnaliseAvaliacoesPage() {
           onChange={(e) => setAte(e.target.value)}
           error={periodoInvalido}
           helperText={periodoInvalido ? 'A data final não pode ser anterior à data inicial.' : ' '}
-          slotProps={{ inputLabel: { shrink: true } }}
+          slotProps={{
+            inputLabel: { shrink: true },
+            formHelperText: {
+              sx: {
+                position: 'absolute',
+                bottom: -20,
+                left: 0,
+                whiteSpace: 'nowrap',
+              },
+            },
+          }}
         />
+        <SeletorCiclo cicloId={cicloId} onChange={handleCicloChange} />
         <Button type="submit" variant="contained" disabled={periodoInvalido || carregando}>
           Aplicar filtro
         </Button>
@@ -189,55 +164,67 @@ export function AnaliseAvaliacoesPage() {
       )}
 
       {!carregando && !erro && dados && !vazio && (
-        <div className="flex flex-col gap-6">
-          {identificadasPorTipo && dados.avaliacao360.identificadas.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <Typography variant="subtitle1">Avaliação 360 — respostas identificadas</Typography>
-              {SECOES_IDENTIFICADAS.map(
-                ({ tipo, titulo }) =>
-                  identificadasPorTipo[tipo].length > 0 && (
-                    <div key={tipo} className="flex flex-col gap-2">
-                      <Typography variant="subtitle2" color="text.secondary">
-                        {titulo}
-                      </Typography>
-                      <div className="flex flex-col gap-2">
-                        {identificadasPorTipo[tipo].map((item, indice) => (
-                          <AvaliacaoIdentificadaCard
-                            key={`${item.avaliadoId}-${item.avaliadorId}-${item.perguntaId}-${indice}`}
-                            item={item}
-                          />
-                        ))}
+        <div className="flex flex-col gap-3">
+          {gruposPorCiclo.map((grupoCiclo) => (
+            <Accordion key={`${resultadoVersao}-${grupoCiclo.cicloId}`} defaultExpanded={Boolean(cicloId)}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="subtitle1" sx={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                  {grupoCiclo.nomeCiclo}
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails className="flex flex-col gap-6">
+                {grupoCiclo.identificadas.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <Typography variant="subtitle2">Avaliação 360 — respostas identificadas</Typography>
+                    {agruparIdentificadasPorPergunta(grupoCiclo.identificadas).map((g) => (
+                      <div key={g.perguntaId} className="flex flex-col gap-2">
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 600, overflowWrap: 'break-word', wordBreak: 'break-word' }}
+                        >
+                          {g.perguntaEnunciado}
+                        </Typography>
+                        <div className="flex flex-col gap-2">
+                          {g.itens.map((item, indice) => (
+                            <AvaliacaoIdentificadaCard
+                              key={`${item.avaliadoId}-${item.avaliadorId}-${indice}`}
+                              item={item}
+                              ocultarEnunciado
+                            />
+                          ))}
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                )}
+
+                {grupoCiclo.paresSubordinado.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <Typography variant="subtitle2">Avaliação 360 — pares e subordinados</Typography>
+                    <div className="flex flex-col gap-2">
+                      {grupoCiclo.paresSubordinado.map((grupo, indice) => (
+                        <GrupoParesSubordinadoCard
+                          key={`${grupo.avaliadoId}-${grupo.tipoRelacionamento}-${indice}`}
+                          grupo={grupo}
+                        />
+                      ))}
                     </div>
-                  ),
-              )}
-            </div>
-          )}
+                  </div>
+                )}
 
-          {dados.avaliacao360.paresSubordinado.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <Typography variant="subtitle1">Avaliação 360 — pares e subordinados</Typography>
-              <div className="flex flex-col gap-2">
-                {dados.avaliacao360.paresSubordinado.map((grupo, indice) => (
-                  <GrupoParesSubordinadoCard
-                    key={`${grupo.avaliadoId}-${grupo.cicloId}-${grupo.tipoRelacionamento}-${indice}`}
-                    grupo={grupo}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {dados.climaGeral.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <Typography variant="subtitle1">Clima e Satisfação</Typography>
-              <div className="flex flex-col gap-2">
-                {dados.climaGeral.map((grupo, indice) => (
-                  <GrupoClimaCard key={`${grupo.cicloId}-${indice}`} grupo={grupo} />
-                ))}
-              </div>
-            </div>
-          )}
+                {grupoCiclo.climaGeral.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <Typography variant="subtitle2">Clima e Satisfação</Typography>
+                    <div className="flex flex-col gap-2">
+                      {grupoCiclo.climaGeral.map((grupo, indice) => (
+                        <GrupoClimaCard key={indice} grupo={grupo} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </AccordionDetails>
+            </Accordion>
+          ))}
         </div>
       )}
     </div>

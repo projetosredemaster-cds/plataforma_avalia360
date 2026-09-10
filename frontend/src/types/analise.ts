@@ -43,6 +43,8 @@ export interface VisaoGeralAnalise {
 // - `textos` dentro de um grupo liberado já vem embaralhado pelo backend A
 //   CADA CHAMADA — nunca reordenar no frontend, nunca exibir número de
 //   posição.
+// - `nomeCiclo` é metadado administrativo do ciclo (não identidade de
+//   avaliador), usado pela UI para os cabeçalhos de Accordion por ciclo.
 
 export interface TextoAbertoItem {
   perguntaId: string
@@ -56,6 +58,7 @@ export type TipoRelacionamentoAnonimizado = 'pares' | 'subordinado'
 export interface AvaliacaoIdentificada {
   tipoRelacionamento: TipoRelacionamentoIdentificado
   cicloId: string
+  nomeCiclo: string
   avaliadoId: string
   avaliadoNome: string
   avaliadorId: string
@@ -67,6 +70,7 @@ export interface AvaliacaoIdentificada {
 
 export interface GrupoParesSubordinado {
   cicloId: string
+  nomeCiclo: string
   avaliadoId: string
   avaliadoNome: string
   tipoRelacionamento: TipoRelacionamentoAnonimizado
@@ -79,6 +83,7 @@ export interface GrupoParesSubordinado {
 
 export interface GrupoClimaGeral {
   cicloId: string
+  nomeCiclo: string
   totalRespondentes: number
   minimoNecessario: number
   liberado: boolean

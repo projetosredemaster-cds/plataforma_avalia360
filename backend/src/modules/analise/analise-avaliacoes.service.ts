@@ -17,30 +17,6 @@ import { Colaborador } from '../colaboradores/colaborador.entity'
 import { PAPEIS_COM_ACESSO, buscarUniversoCiclos, classificarPorTipo, validarDataQuery } from './analise-comum'
 import type { PeriodoConsulta } from './analise-comum'
 
-/**
- * "Avaliações" — lista de respostas individuais de perguntas `texto_aberto`
- * (avaliação 360 + clima geral), com dois guard rails de anonimização
- * DIFERENTES entre si (ver task-backend.md, guard rails críticos nº 1 e nº
- * 2 — leia os comentários abaixo, eles não são redundantes com o guard rail
- * técnico de "Visão Geral"):
- *
- * GUARD RAIL CRÍTICO Nº 1: `ciclos_avaliacao.anonimizar_respostas_pares`
- * NUNCA é lida por nenhuma função deste arquivo — não é uma omissão, é uma
- * decisão de produto já fechada. A única coluna de `ciclos_avaliacao` lida
- * aqui é `minimo_respostas_pares` (`buscarMinimosPorCiclo`, com `select`
- * explícito, para nem sequer trazer a coluna irmã do banco). RH/admin NÃO
- * têm nenhum bypass do limiar — `garantirPapel` decide só "pode entrar na
- * tela", nunca "quanto vê dentro dela".
- *
- * GUARD RAIL CRÍTICO Nº 2: `rel.avaliador_id`/`avaliador.nome_completo`
- * nunca aparecem em `.select()`/`.addSelect()` de nenhuma query que também
- * projete texto de resposta `pares`/`subordinado` — o único uso permitido é
- * dentro de `COUNT(DISTINCT rel.avaliador_id)` no gate
- * (`calcularGateParesSubordinado`). Para `autoavaliacao`/`gestor`/`externo`
- * (`buscarIdentificadas360`), identidade junto do texto é esperada e
- * correta — não é uma violação deste guard rail.
- */
-
 export interface TextoAbertoItem {
   perguntaId: string
   perguntaEnunciado: string
@@ -50,6 +26,7 @@ export interface TextoAbertoItem {
 export interface AvaliacaoIdentificada {
   tipoRelacionamento: 'autoavaliacao' | 'gestor' | 'externo'
   cicloId: string
+  nomeCiclo: string
   avaliadoId: string
   avaliadoNome: string
   avaliadorId: string
@@ -61,6 +38,7 @@ export interface AvaliacaoIdentificada {
 
 export interface GrupoParesSubordinado {
   cicloId: string
+  nomeCiclo: string
   avaliadoId: string
   avaliadoNome: string
   tipoRelacionamento: 'pares' | 'subordinado'
@@ -73,6 +51,7 @@ export interface GrupoParesSubordinado {
 
 export interface GrupoClimaGeral {
   cicloId: string
+  nomeCiclo: string
   totalRespondentes: number
   minimoNecessario: number
   liberado: boolean
@@ -108,7 +87,6 @@ interface GateClimaLinha {
   totalRespondentes: number
 }
 
-/** Fisher-Yates — embaralha uma cópia do array recebido, não muta o original. */
 function embaralhar<T>(itens: T[]): T[] {
   const copia = [...itens]
   for (let i = copia.length - 1; i > 0; i--) {
@@ -120,12 +98,10 @@ function embaralhar<T>(itens: T[]): T[] {
   return copia
 }
 
-// Identidade PROJETADA DELIBERADAMENTE — autoavaliacao/gestor/externo não
-// têm terceiro a proteger (spec 3.2, guard rail crítico nº 2 do plano).
 async function buscarIdentificadas360(
   ids: string[],
   periodo: PeriodoConsulta,
-): Promise<AvaliacaoIdentificada[]> {
+): Promise<Omit<AvaliacaoIdentificada, 'nomeCiclo'>[]> {
   if (ids.length === 0) return []
 
   const linhas = await AppDataSource.getRepository(ItemResposta)
@@ -154,17 +130,11 @@ async function buscarIdentificadas360(
     .orderBy('avaliado.nome_completo')
     .addOrderBy('avaliador.nome_completo')
     .addOrderBy('pergunta.enunciado')
-    .getRawMany<AvaliacaoIdentificada>()
+    .getRawMany<Omit<AvaliacaoIdentificada, 'nomeCiclo'>>()
 
   return linhas
 }
 
-// GATE: único uso permitido de avaliador_id no caminho pares/subordinado é
-// DENTRO de COUNT(DISTINCT ...) — nunca projetado bruto (guard rail crítico nº 2).
-// Decisão de modelagem 3: o corte de período aqui é o MESMO recorte usado
-// depois em buscarTextosParesSubordinado — o conjunto de anonimato do gate
-// precisa bater com o conjunto real exposto, senão um filtro de data
-// estreito poderia reidentificar um respondente isolado.
 async function calcularGateParesSubordinado(
   ids: string[],
   periodo: PeriodoConsulta,
@@ -190,10 +160,6 @@ async function calcularGateParesSubordinado(
   return linhas.map((l) => ({ ...l, totalRespondentes: Number(l.totalRespondentes) }))
 }
 
-// Recebe só os grupos que JÁ passaram no gate — nunca busca texto de grupo
-// abaixo do limiar, nem transitoriamente em memória (defesa em profundidade,
-// além do filtro em montarGruposParesSubordinado). NUNCA seleciona
-// rel.avaliador_id (guard rail crítico nº 2).
 async function buscarTextosParesSubordinado(
   grupos: Array<{ avaliadoId: string; cicloId: string; tipoRelacionamento: string }>,
   periodo: PeriodoConsulta,
@@ -250,6 +216,7 @@ function montarGruposParesSubordinado(
   minimosPorCiclo: Map<string, number>,
   nomes: Map<string, string>,
   textosPorGrupo: Map<string, TextoAbertoItem[]>,
+  nomesCiclos: Map<string, string>,
 ): GrupoParesSubordinado[] {
   return gate.map((g) => {
     const minimo = minimosPorCiclo.get(g.cicloId) ?? 3
@@ -257,6 +224,7 @@ function montarGruposParesSubordinado(
     const chave = `${g.avaliadoId}|${g.cicloId}|${g.tipoRelacionamento}`
     return {
       cicloId: g.cicloId,
+      nomeCiclo: nomesCiclos.get(g.cicloId) ?? '',
       avaliadoId: g.avaliadoId,
       avaliadoNome: nomes.get(g.avaliadoId) ?? '',
       tipoRelacionamento: g.tipoRelacionamento,
@@ -270,10 +238,6 @@ function montarGruposParesSubordinado(
   })
 }
 
-// GATE por CICLO INTEIRO — respostas_clima é estruturalmente anônima, não há
-// avaliador_id a contar; a contagem aqui é de LINHAS de respostas_clima
-// (decisão de modelagem 4), não de ciclo_participantes — mesmo raciocínio de
-// conjunto de anonimato consistente do gate acima.
 async function calcularGateClima(ids: string[], periodo: PeriodoConsulta): Promise<GateClimaLinha[]> {
   if (ids.length === 0) return []
 
@@ -289,8 +253,6 @@ async function calcularGateClima(ids: string[], periodo: PeriodoConsulta): Promi
   return linhas.map((l) => ({ cicloId: l.cicloId, totalRespondentes: Number(l.totalRespondentes) }))
 }
 
-// Só para ciclos JÁ liberados. respostas_clima/itens_resposta_clima não têm
-// NENHUMA coluna de identidade — nada a excluir aqui além do texto em si.
 async function buscarTextosClima(
   idsCiclosLiberados: string[],
   periodo: PeriodoConsulta,
@@ -324,12 +286,14 @@ function montarGruposClima(
   gate: GateClimaLinha[],
   minimosPorCiclo: Map<string, number>,
   textosPorCiclo: Map<string, TextoAbertoItem[]>,
+  nomesCiclos: Map<string, string>,
 ): GrupoClimaGeral[] {
   return gate.map((g) => {
     const minimo = minimosPorCiclo.get(g.cicloId) ?? 3
     const liberado = g.totalRespondentes >= minimo
     return {
       cicloId: g.cicloId,
+      nomeCiclo: nomesCiclos.get(g.cicloId) ?? '',
       totalRespondentes: g.totalRespondentes,
       minimoNecessario: minimo,
       liberado,
@@ -340,7 +304,6 @@ function montarGruposClima(
   })
 }
 
-// select explícito — NUNCA trazer anonimizarRespostasPares (guard rail crítico nº 1).
 async function buscarMinimosPorCiclo(ids: string[]): Promise<Map<string, number>> {
   if (ids.length === 0) return new Map()
   const ciclos = await AppDataSource.getRepository(CicloAvaliacao).find({
@@ -360,12 +323,16 @@ async function buscarNomesColaboradores(ids: string[]): Promise<Map<string, stri
   return new Map(colaboradores.map((c) => [c.id, c.nomeCompleto]))
 }
 
-/**
- * Única função exportada do módulo — lista de respostas individuais
- * `texto_aberto`, sempre restrita a admin/gestor_rh (`garantirPapel` como
- * primeira linha, nenhuma outra checagem de papel em nenhuma função privada
- * deste arquivo — ver guard rail crítico nº 1 no topo).
- */
+async function buscarNomesCiclos(ids: string[]): Promise<Map<string, string>> {
+  const idsUnicos = [...new Set(ids)]
+  if (idsUnicos.length === 0) return new Map()
+  const ciclos = await AppDataSource.getRepository(CicloAvaliacao).find({
+    where: { id: In(idsUnicos) },
+    select: { id: true, nome: true },
+  })
+  return new Map(ciclos.map((c) => [c.id, c.nome]))
+}
+
 export async function buscarAvaliacoes(
   ator: ColaboradorAutenticado,
   dto: BuscarAvaliacoesDto,
@@ -399,12 +366,18 @@ export async function buscarAvaliacoes(
 
   const { idsAval360, idsClima } = await classificarPorTipo(idsUniverso)
 
-  const [identificadas, gateParesSubordinado, gateClima, minimosPorCiclo] = await Promise.all([
+  const [identificadas, gateParesSubordinado, gateClima, minimosPorCiclo, nomesCiclos] = await Promise.all([
     buscarIdentificadas360(idsAval360, periodo),
     calcularGateParesSubordinado(idsAval360, periodo),
     calcularGateClima(idsClima, periodo),
     buscarMinimosPorCiclo(idsUniverso),
+    buscarNomesCiclos(idsUniverso),
   ])
+
+  const identificadasComNome = identificadas.map((item) => ({
+    ...item,
+    nomeCiclo: nomesCiclos.get(item.cicloId) ?? '',
+  }))
 
   const nomesAvaliados = await buscarNomesColaboradores(gateParesSubordinado.map((g) => g.avaliadoId))
 
@@ -417,13 +390,14 @@ export async function buscarAvaliacoes(
     minimosPorCiclo,
     nomesAvaliados,
     textosPorGrupo360,
+    nomesCiclos,
   )
 
   const idsClimaLiberados = gateClima
     .filter((g) => g.totalRespondentes >= (minimosPorCiclo.get(g.cicloId) ?? 3))
     .map((g) => g.cicloId)
   const textosPorCicloClima = await buscarTextosClima(idsClimaLiberados, periodo)
-  const climaGeral = montarGruposClima(gateClima, minimosPorCiclo, textosPorCicloClima)
+  const climaGeral = montarGruposClima(gateClima, minimosPorCiclo, textosPorCicloClima, nomesCiclos)
 
-  return { periodo, cicloId, avaliacao360: { identificadas, paresSubordinado }, climaGeral }
+  return { periodo, cicloId, avaliacao360: { identificadas: identificadasComNome, paresSubordinado }, climaGeral }
 }
