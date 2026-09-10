@@ -1,18 +1,34 @@
 import { randomUUID } from 'node:crypto'
+import { FindOperator } from 'typeorm'
+import { FakeQueryBuilder } from './fakeQueryBuilder'
 
 type Relacoes = Record<string, boolean> | undefined
+
+/** Resolve outro repositório fake a partir da classe de entidade — usado só por `createQueryBuilder` (joins). */
+export type ResolverEntidadeFake = (entidade: Function) => { todas: () => unknown[] }
 
 /**
  * Repositório TypeORM falso, em memória, cobrindo só o subconjunto de API
  * usado pelos services desta task (`find`, `findOne`, `findOneBy`, `count`,
- * `create`, `save`, `delete`). Não há Postgres/Supabase disponível nesta sessão — este
- * fake substitui `AppDataSource.getRepository(...)` via `vi.mock('.../data-source')`
- * nos specs, mantendo o código de produção (`colaboradores.service.ts`,
- * `equipes.service.ts`, middleware `autenticar`) rodando sem nenhuma
- * alteração.
+ * `create`, `save`, `delete`, `createQueryBuilder`). Não há Postgres/Supabase
+ * disponível nesta sessão — este fake substitui `AppDataSource.getRepository(...)`
+ * via `vi.mock('.../data-source')` nos specs, mantendo o código de produção
+ * (`colaboradores.service.ts`, `equipes.service.ts`, `analise.service.ts`,
+ * middleware `autenticar`) rodando sem nenhuma alteração.
+ *
+ * `createQueryBuilder` (adicionado para o módulo `analise`, que agrega via
+ * `QueryBuilder`/SQL cru em vez de `find`/`count` simples) só suporta o
+ * subconjunto de sintaxe efetivamente usado por `analise.service.ts` — ver
+ * `fakeQueryBuilder.ts` para o que é interpretado (`select`/`addSelect`,
+ * `where`/`andWhere` com `<=`/`>=`/`=`/`IN (:...x)`/`BETWEEN ... AND
+ * ...`/`IS [NOT] NULL`, `innerJoin` por igualdade de coluna, `AVG(EXTRACT(...))`/
+ * `COUNT(*)` em `getRawOne`). Não é um interpretador SQL genérico.
  */
 export class FakeRepository<T extends { id: string }> {
   private linhas: T[] = []
+
+  /** Setado externamente (ver `test/analiseFixtures.ts`) para permitir que `createQueryBuilder` resolva JOINs contra outros repositórios fake. */
+  resolverEntidade?: ResolverEntidadeFake
 
   constructor(private readonly resolverRelacoes?: (linha: T, relacoes: Relacoes) => T) {}
 
@@ -35,8 +51,14 @@ export class FakeRepository<T extends { id: string }> {
     } as T
   }
 
-  find = async (opcoes?: { relations?: Relacoes; order?: Record<string, 'ASC' | 'DESC'> }): Promise<T[]> => {
-    let resultado = [...this.linhas]
+  find = async (opcoes?: {
+    where?: Partial<T>
+    relations?: Relacoes
+    order?: Record<string, 'ASC' | 'DESC'>
+  }): Promise<T[]> => {
+    let resultado = opcoes?.where
+      ? this.linhas.filter((linha) => this.combina(linha, opcoes.where!))
+      : [...this.linhas]
     if (opcoes?.order) {
       const entrada = Object.entries(opcoes.order)[0]
       if (entrada) {
@@ -80,6 +102,15 @@ export class FakeRepository<T extends { id: string }> {
     this.linhas = this.linhas.filter((linha) => !this.combina(linha, where))
   }
 
+  /** Ver limitações de sintaxe suportada no comentário da classe/`fakeQueryBuilder.ts`. */
+  createQueryBuilder = (alias: string): FakeQueryBuilder => {
+    if (!this.resolverEntidade) {
+      throw new Error('FakeRepository.resolverEntidade não configurado — ver test/analiseFixtures.ts')
+    }
+    const resolverEntidade = this.resolverEntidade
+    return new FakeQueryBuilder(this.todas(), alias, (entidade) => resolverEntidade(entidade).todas())
+  }
+
   private aplicarRelacoes(linha: T, relacoes: Relacoes): T {
     return this.resolverRelacoes ? this.resolverRelacoes({ ...linha }, relacoes) : linha
   }
@@ -89,6 +120,12 @@ export class FakeRepository<T extends { id: string }> {
   }
 
   private combina(linha: T, where: Partial<T>): boolean {
-    return Object.entries(where).every(([chave, valor]) => (linha as any)[chave] === valor)
+    return Object.entries(where).every(([chave, valor]) => {
+      if (valor instanceof FindOperator) {
+        if (valor.type === 'in') return (valor.value as unknown[]).includes((linha as any)[chave])
+        throw new Error(`FakeRepository: operador FindOperator "${valor.type}" não suportado`)
+      }
+      return (linha as any)[chave] === valor
+    })
   }
 }

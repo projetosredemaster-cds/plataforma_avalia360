@@ -16,6 +16,8 @@ import {
   Typography,
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
+import BarChartIcon from '@mui/icons-material/BarChart'
+import ForumIcon from '@mui/icons-material/Forum'
 import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog'
 import { ProgressoCicloBar } from '../../components/ciclos/ProgressoCicloBar/ProgressoCicloBar'
 import { StatusCicloChip } from '../../components/ciclos/StatusCicloChip/StatusCicloChip'
@@ -277,6 +279,20 @@ export function CiclosListPage() {
                   <CardActions className="flex flex-wrap justify-end gap-1">
                     <Button size="small" onClick={() => navigate(`/ciclos/${ciclo.id}`)}>
                       Ver detalhes
+                    </Button>
+                    <Button
+                      size="small"
+                      startIcon={<BarChartIcon fontSize="small" />}
+                      onClick={() => navigate(`/analise/visao-geral?cicloId=${ciclo.id}`)}
+                    >
+                      Visão Geral
+                    </Button>
+                    <Button
+                      size="small"
+                      startIcon={<ForumIcon fontSize="small" />}
+                      onClick={() => navigate(`/analise/avaliacoes?cicloId=${ciclo.id}`)}
+                    >
+                      Avaliações
                     </Button>
                     {ciclo.status === 'rascunho' && (
                       <>

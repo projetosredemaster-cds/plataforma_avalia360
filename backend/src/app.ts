@@ -1,6 +1,7 @@
 import cors from 'cors'
 import express from 'express'
 import { env } from './config/env'
+import { analiseRouter } from './modules/analise/analise.module'
 import { authRouter } from './modules/auth/auth.module'
 import { ciclosAvaliacaoRouter } from './modules/ciclos-avaliacao/ciclos-avaliacao.module'
 import { coletaRespostasPublicaRouter } from './modules/coleta-respostas-publica/coleta-respostas-publica.module'
@@ -27,6 +28,7 @@ app.use('/api/colaboradores', colaboradoresRouter)
 app.use('/api/pesquisas', pesquisasRouter)
 app.use('/api/competencias', competenciasRouter)
 app.use('/api/ciclos', ciclosAvaliacaoRouter)
+app.use('/api/analise', analiseRouter)
 
 // ROTA PÚBLICA (sem `autenticar`) — colaborador comum responde pesquisas via
 // link + CPF, sem conta no Supabase Auth. Autorização por posse de

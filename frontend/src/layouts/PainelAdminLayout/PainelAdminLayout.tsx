@@ -41,6 +41,7 @@ type MenuLink = {
 type SubmenuOpcao = {
   label: string
   disabled?: boolean
+  to?: string
 }
 
 type Submenu = {
@@ -60,8 +61,8 @@ const GRUPOS: MenuGroup[] = [
     icon: <AssessmentOutlinedIcon fontSize="small" />,
     tipo: 'submenus',
     submenus: [
-      { key: 'quantitativa', label: 'Quantitativa', opcoes: [{ label: 'Em breve', disabled: true }] },
-      { key: 'qualitativa', label: 'Qualitativa', opcoes: [{ label: 'Em breve', disabled: true }] },
+      { key: 'quantitativa', label: 'Quantitativa', opcoes: [{ label: 'Visão Geral', to: '/analise/visao-geral' }] },
+      { key: 'qualitativa', label: 'Qualitativa', opcoes: [{ label: 'Avaliações', to: '/analise/avaliacoes' }] },
     ],
   },
   {
@@ -87,9 +88,10 @@ const GRUPOS: MenuGroup[] = [
 ]
 
 function grupoAtivo(pathname: string): string | null {
-  const grupo = GRUPOS.find(
-    (g) => g.tipo === 'links' && g.items.some((item) => pathname.startsWith(item.to)),
-  )
+  const grupo = GRUPOS.find((g) => {
+    if (g.tipo === 'links') return g.items.some((item) => pathname.startsWith(item.to))
+    return g.submenus.some((submenu) => submenu.opcoes.some((opcao) => opcao.to && pathname.startsWith(opcao.to)))
+  })
   return grupo?.key ?? null
 }
 
@@ -220,11 +222,22 @@ export function PainelAdminLayout() {
                         >
                           <Paper elevation={4} sx={{ borderRadius: 2, ml: 0.5, minWidth: 160 }}>
                             <MenuList dense>
-                              {submenu.opcoes.map((opcao) => (
-                                <MuiMenuItem key={opcao.label} disabled={opcao.disabled}>
-                                  {opcao.label}
-                                </MuiMenuItem>
-                              ))}
+                              {submenu.opcoes.map((opcao) =>
+                                opcao.to ? (
+                                  <MuiMenuItem
+                                    key={opcao.label}
+                                    component={NavLink}
+                                    to={opcao.to}
+                                    onClick={() => setSubmenuAberto(null)}
+                                  >
+                                    {opcao.label}
+                                  </MuiMenuItem>
+                                ) : (
+                                  <MuiMenuItem key={opcao.label} disabled={opcao.disabled}>
+                                    {opcao.label}
+                                  </MuiMenuItem>
+                                ),
+                              )}
                             </MenuList>
                           </Paper>
                         </Popper>

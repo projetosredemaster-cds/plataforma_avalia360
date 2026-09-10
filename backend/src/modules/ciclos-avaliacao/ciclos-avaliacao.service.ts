@@ -244,9 +244,17 @@ function validarData(valor: unknown, campo: string): string {
   }
 
   const texto = valor.trim()
-  const data = new Date(`${texto}T00:00:00Z`)
+  const ano = Number(texto.slice(0, 4))
+  const mes = Number(texto.slice(5, 7))
+  const dia = Number(texto.slice(8, 10))
+  const data = new Date(Date.UTC(ano, mes - 1, dia))
 
-  if (Number.isNaN(data.getTime())) {
+  if (
+    Number.isNaN(data.getTime()) ||
+    data.getUTCFullYear() !== ano ||
+    data.getUTCMonth() !== mes - 1 ||
+    data.getUTCDate() !== dia
+  ) {
     throw new ErroHttp(422, 'CAMPO_INVALIDO', `Campo "${campo}" não é uma data de calendário válida.`)
   }
 
