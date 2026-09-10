@@ -5,9 +5,11 @@ import {
   AccordionSummary,
   Alert,
   Button,
+  IconButton,
   Paper,
   Skeleton,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
@@ -22,6 +24,7 @@ import { buscarAvaliacoesAnalise } from '../../services/analiseService'
 import type { AvaliacoesAnalise } from '../../types/analise'
 import { agruparIdentificadasPorPergunta, agruparPorCiclo } from './agrupamento'
 import { hojeYMD, inicioAnoCorrenteYMD } from './formatadores'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 
 export function AnaliseAvaliacoesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -104,10 +107,15 @@ export function AnaliseAvaliacoesPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-start gap-2">
         <Typography variant="h5" component="h1">
           Avaliações
         </Typography>
+       <Tooltip title="Exibe apenas respostas de perguntas abertas por ciclo." arrow placement="top">
+        <IconButton size="medium" aria-label="Avaliações" sx={{ p: 0.25 }}>
+          <InfoOutlinedIcon fontSize="medium" color="action" />
+        </IconButton>
+      </Tooltip>
       </div>
 
       <Paper component="form" onSubmit={handleSubmit} className="flex flex-wrap items-center gap-3 p-4">

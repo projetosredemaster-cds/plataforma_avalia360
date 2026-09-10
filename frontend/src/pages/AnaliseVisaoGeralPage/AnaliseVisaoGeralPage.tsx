@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Alert, Button, Paper, Skeleton, TextField, Typography } from '@mui/material'
+import { Alert, Button, IconButton, Paper, Skeleton, TextField, Tooltip, Typography } from '@mui/material'
 import { useSearchParams } from 'react-router-dom'
 import { MetricaCard } from '../../components/analise/MetricaCard/MetricaCard'
 import { SeletorCiclo } from '../../components/analise/SeletorCiclo/SeletorCiclo'
@@ -7,6 +7,7 @@ import { ApiError } from '../../lib/apiClient'
 import { buscarVisaoGeralAnalise } from '../../services/analiseService'
 import type { VisaoGeralAnalise } from '../../types/analise'
 import { formatarHoras, formatarInteiro, formatarPercentual, hojeYMD, inicioAnoCorrenteYMD } from './formatadores'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 
 export function AnaliseVisaoGeralPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -75,10 +76,15 @@ export function AnaliseVisaoGeralPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-start gap-2">
         <Typography variant="h5" component="h1">
           Visão Geral
         </Typography>
+        <Tooltip title="Resumo dos dados das pesquisas ativas e concluídas no período selecionado." arrow placement="top">
+            <IconButton size="medium" aria-label="Visão Geral" sx={{ p: 0.25 }}>
+                <InfoOutlinedIcon fontSize="medium" color="action" />
+            </IconButton>
+          </Tooltip>
       </div>
 
       <Paper component="form" onSubmit={handleSubmit} className="flex flex-wrap items-center gap-3 p-4">

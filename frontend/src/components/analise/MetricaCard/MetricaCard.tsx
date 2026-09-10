@@ -14,12 +14,6 @@ interface MetricaCardProps {
   tooltip?: string
 }
 
-/**
- * "Stat tile" genérico reutilizável por qualquer tela futura do módulo
- * Análise (Ranking, Performance, etc.) — não acoplado a nenhum shape
- * específico de `VisaoGeralAnalise`. Recebe só strings já formatadas pelo
- * chamador; nenhuma lógica de cálculo/formatação vive aqui.
- */
 export function MetricaCard({ titulo, valor, descricao, detalhes, tooltip }: MetricaCardProps) {
   return (
     <Card className="flex h-full flex-col">
