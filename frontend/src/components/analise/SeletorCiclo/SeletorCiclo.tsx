@@ -49,7 +49,7 @@ export function SeletorCiclo({ cicloId, onChange }: SeletorCicloProps) {
       size="small"
       value={cicloId ?? ''}
       onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
-      className="min-w-[220px]"
+      sx={{ minWidth: 240 }}
     >
       <MenuItem value="">Todos os ciclos</MenuItem>
       {ciclos.map((c) => (

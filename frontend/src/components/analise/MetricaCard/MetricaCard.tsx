@@ -1,4 +1,5 @@
-import { Card, CardContent, Divider, Typography } from '@mui/material'
+import { Card, CardContent, Divider, IconButton, Tooltip, Typography } from '@mui/material'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 
 interface MetricaCardDetalhe {
   rotulo: string
@@ -10,6 +11,7 @@ interface MetricaCardProps {
   valor: string
   descricao?: string
   detalhes?: MetricaCardDetalhe[]
+  tooltip?: string
 }
 
 /**
@@ -18,13 +20,22 @@ interface MetricaCardProps {
  * específico de `VisaoGeralAnalise`. Recebe só strings já formatadas pelo
  * chamador; nenhuma lógica de cálculo/formatação vive aqui.
  */
-export function MetricaCard({ titulo, valor, descricao, detalhes }: MetricaCardProps) {
+export function MetricaCard({ titulo, valor, descricao, detalhes, tooltip }: MetricaCardProps) {
   return (
     <Card className="flex h-full flex-col">
       <CardContent className="flex flex-1 flex-col gap-1">
-        <Typography variant="subtitle2" color="text.secondary">
-          {titulo}
-        </Typography>
+        <div className="flex items-center gap-0.5">
+          <Typography variant="subtitle2" color="text.secondary">
+            {titulo}
+          </Typography>
+          {tooltip && (
+            <Tooltip title={tooltip}>
+              <IconButton size="small" aria-label={`Sobre a métrica ${titulo}`} sx={{ p: 0.25 }}>
+                <InfoOutlinedIcon fontSize="small" color="action" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </div>
         <Typography variant="h4" component="p" sx={{ fontWeight: 600 }}>
           {valor}
         </Typography>

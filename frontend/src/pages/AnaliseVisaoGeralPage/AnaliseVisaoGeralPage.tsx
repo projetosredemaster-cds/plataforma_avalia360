@@ -11,8 +11,10 @@ import { formatarHoras, formatarInteiro, formatarPercentual, hojeYMD, inicioAnoC
 export function AnaliseVisaoGeralPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [de, setDe] = useState(() => inicioAnoCorrenteYMD())
-  const [ate, setAte] = useState(() => hojeYMD())
+  const [deInicial] = useState(() => inicioAnoCorrenteYMD())
+  const [ateInicial] = useState(() => hojeYMD())
+  const [de, setDe] = useState(deInicial)
+  const [ate, setAte] = useState(ateInicial)
   const [cicloId, setCicloId] = useState<string | null>(() => searchParams.get('cicloId'))
 
   const [dados, setDados] = useState<VisaoGeralAnalise | null>(null)
@@ -20,16 +22,20 @@ export function AnaliseVisaoGeralPage() {
   const [erro, setErro] = useState<string | null>(null)
 
   const periodoInvalido = ate < de
+  const filtroAlterado = cicloId !== null || de !== deInicial || ate !== ateInicial
+
   const executarBusca = useCallback(
-    async (overrides?: { cicloId?: string | null }) => {
+    async (overrides?: { de?: string; ate?: string; cicloId?: string | null }) => {
+      const deAtual = overrides?.de !== undefined ? overrides.de : de
+      const ateAtual = overrides?.ate !== undefined ? overrides.ate : ate
       const cicloIdAtual = overrides?.cicloId !== undefined ? overrides.cicloId : cicloId
 
-      if (ate < de) return
+      if (ateAtual < deAtual) return
 
       setCarregando(true)
       setErro(null)
       try {
-        const resultado = await buscarVisaoGeralAnalise({ de, ate, cicloId: cicloIdAtual ?? undefined })
+        const resultado = await buscarVisaoGeralAnalise({ de: deAtual, ate: ateAtual, cicloId: cicloIdAtual ?? undefined })
         setDados(resultado)
       } catch (err) {
         if (err instanceof ApiError && err.codigo === 'CICLO_NAO_ENCONTRADO') {
@@ -45,13 +51,7 @@ export function AnaliseVisaoGeralPage() {
   )
 
   useEffect(() => {
-    // Carga inicial via API — não é dado derivável durante a renderização.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     executarBusca()
-    // Fetch intencionalmente só-no-mount: `executarBusca` muda a cada tecla em
-    // "De"/"Até"/troca de ciclo, incluí-la no array de deps repetiria a busca a
-    // cada edição do formulário.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -63,6 +63,14 @@ export function AnaliseVisaoGeralPage() {
     setCicloId(novoCicloId)
     setSearchParams(novoCicloId ? { cicloId: novoCicloId } : {}, { replace: true })
     executarBusca({ cicloId: novoCicloId })
+  }
+
+  function handleLimparFiltro() {
+    setDe(deInicial)
+    setAte(ateInicial)
+    setCicloId(null)
+    setSearchParams({}, { replace: true })
+    executarBusca({ de: deInicial, ate: ateInicial, cicloId: null })
   }
 
   return (
@@ -106,6 +114,11 @@ export function AnaliseVisaoGeralPage() {
         <Button type="submit" variant="contained" disabled={periodoInvalido || carregando}>
           Aplicar filtro
         </Button>
+        {filtroAlterado && (
+          <Button variant="text" onClick={handleLimparFiltro} disabled={carregando}>
+            Limpar filtro
+          </Button>
+        )}
       </Paper>
 
       {carregando && (
@@ -141,11 +154,13 @@ export function AnaliseVisaoGeralPage() {
                 valor={formatarInteiro(dados.totalCiclos)}
                 descricao={`${dados.totalCiclos === 1 ? 'ciclo' : 'ciclos'} no período`}
                 detalhes={[{ rotulo: 'Total de respostas', valor: formatarInteiro(dados.totalRespostas) }]}
+                tooltip="Quantidade de ciclos de avaliação que estavam em andamento nesse período, e quantas pessoas já responderam."
               />
               <MetricaCard
                 titulo="Taxa de resposta média"
                 valor={formatarPercentual(dados.taxaRespostaMedia)}
                 descricao="Ponderada por volume de participantes"
+                tooltip="De todas as pessoas que precisavam responder nesse período, esse é o percentual que já respondeu."
               />
               <MetricaCard
                 titulo="Tempo médio de resposta"
@@ -155,6 +170,7 @@ export function AnaliseVisaoGeralPage() {
                   { rotulo: 'Avaliação 360', valor: formatarHoras(dados.tempoMedioResposta.avaliacao_360.horas) },
                   { rotulo: 'Clima e Satisfação', valor: formatarHoras(dados.tempoMedioResposta.clima_geral.horas) },
                 ]}
+                tooltip="Tempo médio entre o momento em que o link da pesquisa foi enviado e o momento em que a pessoa respondeu, calculado com base em todas as respostas do período selecionado. Exibido em horas quando menor que 24 horas, ou em dias quando 24 horas ou mais."
               />
             </div>
           </div>
@@ -169,6 +185,7 @@ export function AnaliseVisaoGeralPage() {
                 detalhes={[
                   { rotulo: 'Respostas', valor: formatarInteiro(dados.distribuicaoPorTipo.avaliacao_360.totalRespostas) },
                 ]}
+                tooltip="Quantos ciclos de Avaliação 360° existem nesse período e quantas respostas já foram registradas neles."
               />
               <MetricaCard
                 titulo="Clima e Satisfação"
@@ -177,6 +194,7 @@ export function AnaliseVisaoGeralPage() {
                 detalhes={[
                   { rotulo: 'Respostas', valor: formatarInteiro(dados.distribuicaoPorTipo.clima_geral.totalRespostas) },
                 ]}
+                tooltip="Quantos ciclos de Clima e Satisfação existem nesse período e quantas respostas já foram registradas neles."
               />
             </div>
           </div>

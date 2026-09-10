@@ -13,12 +13,6 @@ export interface GrupoCiclo {
   climaGeral: GrupoClimaGeral[]
 }
 
-/**
- * Agrupa os três arrays de `AvaliacoesAnalise` por `cicloId`. Ordem = primeira
- * aparição na resposta (varrendo identificadas → paresSubordinado → climaGeral),
- * nunca ordenada por nome/data — usa `Map` só para deduplicar por `cicloId`
- * preservando a ordem de inserção (não é um `.sort()`).
- */
 export function agruparPorCiclo(dados: AvaliacoesAnalise): GrupoCiclo[] {
   const mapa = new Map<string, GrupoCiclo>()
 
@@ -44,10 +38,6 @@ export interface GrupoPergunta<T> {
   itens: T[]
 }
 
-/**
- * Agrupa `identificadas` (de UM ciclo) por `perguntaId`. Só filtragem/bucket sobre
- * dado já 100% identificado — mesma natureza não sensível da decisão 6 original.
- */
 export function agruparIdentificadasPorPergunta(itens: AvaliacaoIdentificada[]): GrupoPergunta<AvaliacaoIdentificada>[] {
   const mapa = new Map<string, GrupoPergunta<AvaliacaoIdentificada>>()
   for (const item of itens) {

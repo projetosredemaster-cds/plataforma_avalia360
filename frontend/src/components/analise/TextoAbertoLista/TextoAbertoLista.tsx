@@ -11,14 +11,6 @@ interface GrupoPerguntaTexto {
   textos: TextoAbertoItem[]
 }
 
-/**
- * Agrupa POR PERGUNTA os textos de UM ÚNICO grupo (avaliado+ciclo+tipo, ou o único
- * grupo de clima do ciclo) recebido via prop — nunca funde `textos` de grupos
- * diferentes (quem chama já passa só um `grupo.textos` por vez). Bucket via `Map`,
- * preserva a ordem de inserção — a ordem das perguntas é a ordem da primeira
- * ocorrência no array já embaralhado pelo backend; a ordem dos textos DENTRO de
- * cada pergunta é exatamente a do array recebido. Nenhum `.sort()`/`.reverse()`.
- */
 function agruparPorPergunta(textos: TextoAbertoItem[]): GrupoPerguntaTexto[] {
   const mapa = new Map<string, GrupoPerguntaTexto>()
   for (const item of textos) {
@@ -32,20 +24,17 @@ function agruparPorPergunta(textos: TextoAbertoItem[]): GrupoPerguntaTexto[] {
   return Array.from(mapa.values())
 }
 
-/**
- * Lista de textos de UM grupo, agrupada por pergunta (cabeçalho uma única vez),
- * SEM numeração/rótulo de posição em nenhum texto individual e SEM qualquer
- * atribuição de autoria — quem chama decide se/como identificar o GRUPO (avaliado,
- * ciclo), nunca o texto individual.
- */
 export function TextoAbertoLista({ textos }: TextoAbertoListaProps) {
   const grupos = agruparPorPergunta(textos)
   return (
     <div className="flex flex-col gap-4">
       {grupos.map((grupo) => (
         <div key={grupo.perguntaId} className="flex flex-col gap-2">
-          <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
-            {grupo.perguntaEnunciado}
+          <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+            Pergunta:{' '}
+            <Typography component="span" variant="body2" color="text.primary" sx={{ fontWeight: 700 }}>
+              {grupo.perguntaEnunciado}
+            </Typography>
           </Typography>
           <div className="flex flex-col gap-2">
             {grupo.textos.map((item, indice) => (

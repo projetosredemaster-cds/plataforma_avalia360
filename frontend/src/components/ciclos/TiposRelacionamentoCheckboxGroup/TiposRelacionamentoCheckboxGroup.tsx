@@ -10,12 +10,7 @@ interface TiposRelacionamentoCheckboxGroupProps {
   helperText?: string
 }
 
-/**
- * Grupo controlado de checkboxes para `tiposRelacionamentoGerados` —
- * reaproveitado por `CicloFormPage` (criação) e `CicloDadosForm` (edição).
- * Puramente controlado (`value`/`onChange` via props), sem estado interno e
- * sem chamada de API — a página/formulário pai persiste.
- */
+
 export function TiposRelacionamentoCheckboxGroup({
   value,
   onChange,

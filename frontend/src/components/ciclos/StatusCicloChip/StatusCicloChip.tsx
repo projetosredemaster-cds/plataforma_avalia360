@@ -11,7 +11,6 @@ interface StatusCicloChipProps {
   status: StatusCiclo
 }
 
-/** Reaproveitado no card da listagem e no cabeçalho da tela de detalhe. */
 export function StatusCicloChip({ status }: StatusCicloChipProps) {
   const { label, color } = CONFIG[status]
   return <Chip label={label} color={color} size="small" />

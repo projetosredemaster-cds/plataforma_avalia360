@@ -26,8 +26,10 @@ import { hojeYMD, inicioAnoCorrenteYMD } from './formatadores'
 export function AnaliseAvaliacoesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [de, setDe] = useState(() => inicioAnoCorrenteYMD())
-  const [ate, setAte] = useState(() => hojeYMD())
+  const [deInicial] = useState(() => inicioAnoCorrenteYMD())
+  const [ateInicial] = useState(() => hojeYMD())
+  const [de, setDe] = useState(deInicial)
+  const [ate, setAte] = useState(ateInicial)
   const [cicloId, setCicloId] = useState<string | null>(() => searchParams.get('cicloId'))
 
   const [dados, setDados] = useState<AvaliacoesAnalise | null>(null)
@@ -36,17 +38,20 @@ export function AnaliseAvaliacoesPage() {
   const [resultadoVersao, setResultadoVersao] = useState(0)
 
   const periodoInvalido = ate < de
+  const filtroAlterado = cicloId !== null || de !== deInicial || ate !== ateInicial
 
   const executarBusca = useCallback(
-    async (overrides?: { cicloId?: string | null }) => {
+    async (overrides?: { de?: string; ate?: string; cicloId?: string | null }) => {
+      const deAtual = overrides?.de !== undefined ? overrides.de : de
+      const ateAtual = overrides?.ate !== undefined ? overrides.ate : ate
       const cicloIdAtual = overrides?.cicloId !== undefined ? overrides.cicloId : cicloId
 
-      if (ate < de) return
+      if (ateAtual < deAtual) return
 
       setCarregando(true)
       setErro(null)
       try {
-        const resultado = await buscarAvaliacoesAnalise({ de, ate, cicloId: cicloIdAtual ?? undefined })
+        const resultado = await buscarAvaliacoesAnalise({ de: deAtual, ate: ateAtual, cicloId: cicloIdAtual ?? undefined })
         setDados(resultado)
         setResultadoVersao((v) => v + 1)
       } catch (err) {
@@ -63,13 +68,7 @@ export function AnaliseAvaliacoesPage() {
   )
 
   useEffect(() => {
-    // Carga inicial via API — não é dado derivável durante a renderização.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     executarBusca()
-    // Fetch intencionalmente só-no-mount: `executarBusca` muda a cada tecla em
-    // "De"/"Até"/troca de ciclo, incluí-la no array de deps repetiria a busca a
-    // cada edição do formulário.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -81,6 +80,14 @@ export function AnaliseAvaliacoesPage() {
     setCicloId(novoCicloId)
     setSearchParams(novoCicloId ? { cicloId: novoCicloId } : {}, { replace: true })
     executarBusca({ cicloId: novoCicloId })
+  }
+
+  function handleLimparFiltro() {
+    setDe(deInicial)
+    setAte(ateInicial)
+    setCicloId(null)
+    setSearchParams({}, { replace: true })
+    executarBusca({ de: deInicial, ate: ateInicial, cicloId: null })
   }
 
   const gruposPorCiclo = useMemo(() => (dados ? agruparPorCiclo(dados) : []), [dados])
@@ -136,6 +143,11 @@ export function AnaliseAvaliacoesPage() {
         <Button type="submit" variant="contained" disabled={periodoInvalido || carregando}>
           Aplicar filtro
         </Button>
+        {filtroAlterado && (
+          <Button variant="text" onClick={handleLimparFiltro} disabled={carregando}>
+            Limpar filtro
+          </Button>
+        )}
       </Paper>
 
       {!carregando && !erro && existeGrupoLiberado && <AvisoLimitacaoAnonimizacao />}

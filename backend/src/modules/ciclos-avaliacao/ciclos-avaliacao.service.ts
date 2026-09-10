@@ -262,11 +262,16 @@ function validarData(valor: unknown, campo: string): string {
 }
 
 function validarMinimoRespostasPares(valor: unknown): number {
-  if (typeof valor !== 'number' || !Number.isInteger(valor) || valor < 1) {
+  if (
+    typeof valor !== 'number' ||
+    !Number.isInteger(valor) ||
+    valor <= 1 ||
+    valor % 2 === 0
+  ) {
     throw new ErroHttp(
       422,
       'CAMPO_INVALIDO',
-      'Campo "minimoRespostasPares" deve ser um número inteiro maior ou igual a 1.',
+      'Campo "minimoRespostasPares" deve ser um número inteiro ímpar maior que 1 (ex.: 3, 5, 7).',
     )
   }
   return valor
@@ -319,8 +324,11 @@ export async function criar(
     )
   }
 
-  const anonimizarRespostasPares =
-    dto.anonimizarRespostasPares !== undefined ? Boolean(dto.anonimizarRespostasPares) : true
+  // Sempre true — a anonimização de respostas pares/subordinado nunca pode
+  // ser desligada (guard rail de anonimização, ver skill
+  // backend-anonimizacao-respostas). Não lê `dto`: o campo foi removido de
+  // `CriarCicloDto` justamente para não haver como o payload desligar isso.
+  const anonimizarRespostasPares = true
 
   const minimoRespostasPares =
     dto.minimoRespostasPares !== undefined ? validarMinimoRespostasPares(dto.minimoRespostasPares) : 3
@@ -550,9 +558,11 @@ export async function atualizar(
     )
   }
 
-  if (dto.anonimizarRespostasPares !== undefined) {
-    ciclo.anonimizarRespostasPares = Boolean(dto.anonimizarRespostasPares)
-  }
+  // `anonimizarRespostasPares` não existe mais em `AtualizarCicloDto` — não
+  // há campo a ler aqui. Se um payload externo (fora da UI/tipos do DTO)
+  // mandar esse campo mesmo assim, ele é ignorado silenciosamente: a coluna
+  // permanece sempre `true` (guard rail de anonimização, ver skill
+  // backend-anonimizacao-respostas).
 
   if (dto.minimoRespostasPares !== undefined) {
     ciclo.minimoRespostasPares = validarMinimoRespostasPares(dto.minimoRespostasPares)

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, Button, Card, CardContent, FormControlLabel, Switch, TextField, Typography } from '@mui/material'
+import { Alert, Button, Card, CardContent, Chip, TextField, Typography } from '@mui/material'
 import { TiposRelacionamentoCheckboxGroup } from '../../components/ciclos/TiposRelacionamentoCheckboxGroup/TiposRelacionamentoCheckboxGroup'
 import { ApiError } from '../../lib/apiClient'
 import { atualizarCiclo } from '../../services/ciclosService'
@@ -21,15 +21,6 @@ interface CicloDadosFormProps {
   tipoPesquisa: TipoPesquisa | null
 }
 
-/**
- * Cabeçalho editável de `CicloDetalhePage`. Subcomponente local (não
- * exportado fora desta pasta), mesmo critério já usado para `PaginaEditor`
- * em `PesquisaConstrutorPage`. Editável apenas quando `ciclo.status ===
- * 'rascunho'` — essa restrição é reforçada de verdade pelo backend
- * (`PUT /api/ciclos/:id` → `409 CICLO_NAO_EDITAVEL` fora de rascunho), então,
- * diferente da trava equivalente em `PesquisaConstrutorPage`, esta não
- * precisa ser documentada como "só client-side".
- */
 export function CicloDadosForm({ ciclo, onAtualizado, tipoPesquisa }: CicloDadosFormProps) {
   const somenteLeitura = ciclo.status !== 'rascunho'
 
@@ -38,7 +29,6 @@ export function CicloDadosForm({ ciclo, onAtualizado, tipoPesquisa }: CicloDados
   const [dataInicio, setDataInicio] = useState(ciclo.dataInicio)
   const [dataFim, setDataFim] = useState(ciclo.dataFim)
   const [minimoRespostasPares, setMinimoRespostasPares] = useState(String(ciclo.minimoRespostasPares))
-  const [anonimizarRespostasPares, setAnonimizarRespostasPares] = useState(ciclo.anonimizarRespostasPares)
   const [tiposRelacionamentoGerados, setTiposRelacionamentoGerados] = useState<TipoRelacionamentoGeravel[]>(
     ciclo.tiposRelacionamentoGerados,
   )
@@ -66,8 +56,8 @@ export function CicloDadosForm({ ciclo, onAtualizado, tipoPesquisa }: CicloDados
       erros.dataFim = 'A data de fim não pode ser anterior à data de início.'
     }
     const minimoNumero = Number(minimoRespostasPares)
-    if (!Number.isInteger(minimoNumero) || minimoNumero < 1) {
-      erros.minimoRespostasPares = 'Informe um número inteiro maior ou igual a 1.'
+    if (!Number.isInteger(minimoNumero) || minimoNumero <= 1 || minimoNumero % 2 === 0) {
+      erros.minimoRespostasPares = 'Informe um número ímpar maior que 1 (3, 5, 7, ...).'
     }
     if (tipoPesquisa !== 'clima_geral' && tiposRelacionamentoGerados.length === 0) {
       erros.tiposRelacionamentoGerados = 'Selecione ao menos um tipo de relação.'
@@ -86,7 +76,6 @@ export function CicloDadosForm({ ciclo, onAtualizado, tipoPesquisa }: CicloDados
         descricao: descricao.trim() || undefined,
         dataInicio,
         dataFim,
-        anonimizarRespostasPares,
         minimoRespostasPares: Number(minimoRespostasPares),
         tiposRelacionamentoGerados,
       })
@@ -170,16 +159,16 @@ export function CicloDadosForm({ ciclo, onAtualizado, tipoPesquisa }: CicloDados
           required
         />
 
-        <FormControlLabel
-          control={
-            <Switch
-              checked={anonimizarRespostasPares}
-              onChange={(e) => setAnonimizarRespostasPares(e.target.checked)}
-              disabled={somenteLeitura || salvando}
-            />
-          }
-          label="Anonimizar respostas de pares/subordinado (política de exposição de respostas do ciclo, aplicada pelo backend)"
-        />
+        <div className="flex items-center gap-2">
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`Pares anonimizados: ${ciclo.anonimizarRespostasPares ? 'Sim' : 'Não'}`}
+          />
+          <Typography variant="body2" color="text.secondary">
+            Respostas de colegas e liderados avaliando o gestor são sempre anonimizadas.
+          </Typography>
+        </div>
 
         {tipoPesquisa !== 'clima_geral' && (
           <TiposRelacionamentoCheckboxGroup

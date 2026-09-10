@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Alert, Button, Paper, Switch, TextField, Typography, FormControlLabel } from '@mui/material'
+import { Alert, Button, Chip, Paper, TextField, Typography } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { TiposRelacionamentoCheckboxGroup } from '../../components/ciclos/TiposRelacionamentoCheckboxGroup/TiposRelacionamentoCheckboxGroup'
 import { ApiError } from '../../lib/apiClient'
@@ -23,7 +23,6 @@ export function CicloFormPage() {
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim] = useState('')
   const [minimoRespostasPares, setMinimoRespostasPares] = useState('3')
-  const [anonimizarRespostasPares, setAnonimizarRespostasPares] = useState(true)
   const [tiposRelacionamentoGerados, setTiposRelacionamentoGerados] = useState<TipoRelacionamentoGeravel[]>([
     'autoavaliacao',
     'gestor',
@@ -54,8 +53,8 @@ export function CicloFormPage() {
       erros.dataFim = 'A data de fim não pode ser anterior à data de início.'
     }
     const minimoNumero = Number(minimoRespostasPares)
-    if (!Number.isInteger(minimoNumero) || minimoNumero < 1) {
-      erros.minimoRespostasPares = 'Informe um número inteiro maior ou igual a 1.'
+    if (!Number.isInteger(minimoNumero) || minimoNumero <= 1 || minimoNumero % 2 === 0) {
+      erros.minimoRespostasPares = 'Informe um número ímpar maior que 1 (3, 5, 7, ...).'
     }
     if (tiposRelacionamentoGerados.length === 0) {
       erros.tiposRelacionamentoGerados = 'Selecione ao menos um tipo de relação.'
@@ -77,7 +76,6 @@ export function CicloFormPage() {
         descricao: descricao.trim() || undefined,
         dataInicio,
         dataFim,
-        anonimizarRespostasPares,
         minimoRespostasPares: Number(minimoRespostasPares),
         tiposRelacionamentoGerados,
       })
@@ -145,30 +143,28 @@ export function CicloFormPage() {
         </div>
 
         <TextField
-          label="Mínimo de respondentes (pares/subordinado)"
+          label="Mínimo de respondentes"
           type="number"
           value={minimoRespostasPares}
           onChange={(e) => setMinimoRespostasPares(e.target.value)}
           error={Boolean(errosCampo.minimoRespostasPares)}
           helperText={
             errosCampo.minimoRespostasPares ??
-            'Só mostra o resultado de colegas/liderados quando pelo menos esse número de pessoas já tiver respondido, para não dar pra identificar quem disse o quê.'
+            'Só mostra o resultado do ciclo quando pelo menos esse número de pessoas já tiver respondido, para não identificar o colaborador que finalizou a pesquisa.'
           }
           disabled={salvando}
           slotProps={{ htmlInput: { min: 1, step: 1 } }}
           required
         />
 
-        <FormControlLabel
-          control={
-            <Switch
-              checked={anonimizarRespostasPares}
-              onChange={(e) => setAnonimizarRespostasPares(e.target.checked)}
-              disabled={salvando}
-            />
-          }
-          label="Esconde quem respondeu quando a avaliação vem de um colega ou de um liderado avaliando o gestor."
-        />
+        <div className="flex items-center gap-2">
+          <Chip
+              size="medium"
+              variant="outlined"
+              label="Respostas de colegas/colaboradores sempre serão anonimizados."
+              color="warning"
+          />
+        </div>
 
         <TiposRelacionamentoCheckboxGroup
           value={tiposRelacionamentoGerados}

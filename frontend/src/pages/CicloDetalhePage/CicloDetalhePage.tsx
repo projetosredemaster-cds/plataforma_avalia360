@@ -65,12 +65,10 @@ import { CicloDadosForm } from './CicloDadosForm'
 const FORMATADOR_DATA = new Intl.DateTimeFormat('pt-BR')
 const FORMATADOR_DATA_HORA = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 
-/** `'YYYY-MM-DD'`/ISO tratado como data local (nunca `new Date(data)` puro, que pode deslocar um dia por fuso). */
 function formatarData(data: string): string {
   return FORMATADOR_DATA.format(new Date(`${data}T00:00:00`))
 }
 
-/** Descreve o alvo do `ConfirmDialog` de "Expirar envio" sem assumir avaliador/avaliado (que não existe para clima). */
 function rotuloAlvoExpirar(envio: EnvioPesquisaAcao | null): string {
   if (!envio) return ''
   return ehEnvioAvaliacao360(envio)
@@ -78,11 +76,6 @@ function rotuloAlvoExpirar(envio: EnvioPesquisaAcao | null): string {
     : 'da campanha de clima e satisfação deste ciclo'
 }
 
-/**
- * Bip curto (~0.25s, senoide com fade-out) via Web Audio API nativa — sem
- * nenhum arquivo de áudio novo em `public/`. Silenciosamente ignorado em
- * ambientes sem suporte (ex.: `AudioContext` indisponível).
- */
 function tocarSomNotificacao() {
   try {
     const AudioContextCtor =
@@ -103,17 +96,9 @@ function tocarSomNotificacao() {
       contexto.close().catch(() => {})
     }
   } catch {
-    // Ambiente sem suporte a Web Audio API — notificação sonora é best-effort.
   }
 }
 
-/**
- * Tela central do motor de ciclos: dados do ciclo (editáveis só em
- * rascunho), participantes, pesquisa vinculada, ativação/encerramento e,
- * quando o ciclo já saiu de rascunho, as tabelas de relacionamentos gerados
- * e de envios (ambas dado IDENTIFICADO de quem avalia quem — nunca
- * extraídas daqui, ver `types/ciclo.ts` e `types/envio.ts`).
- */
 export function CicloDetalhePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -176,9 +161,7 @@ export function CicloDetalhePage() {
 
   const [atualizando, setAtualizando] = useState(false)
   const [novasRespostas, setNovasRespostas] = useState(0)
-  /** Contagem de referência ("respostas conhecidas até a última atualização completa"). */
   const baselineConcluidosRef = useRef<number | null>(null)
-  /** Maior delta já notificado desde o último baseline — evita repetir o som a cada tick sem resposta nova. */
   const ultimoDeltaNotificadoRef = useRef(0)
 
   const carregarRelacionamentos = useCallback(async (cicloId: string) => {
@@ -241,17 +224,8 @@ export function CicloDetalhePage() {
       setPesquisas(dadosPesquisas)
       setColaboradores(dadosColaboradores)
       setEquipes(dadosEquipes)
-      // A rota de relacionamentos existe e não erraria em rascunho, mas a
-      // lista sempre estaria vazia antes da ativação — evita-se a chamada.
-      // Envios são gerados na mesma transação que relacionamentos (na
-      // ativação), então seguem a mesma condição — chamadas independentes,
-      // uma não bloqueia a outra em caso de falha.
       if (dadosCiclo.status !== 'rascunho') {
         const pesquisaDoCiclo = dadosPesquisas.find((p) => p.cicloId === dadosCiclo.id) ?? null
-        // Otimização: pula a chamada de relacionamentos só quando já se SABE
-        // (pela pesquisa vinculada) que é clima_geral — que nunca gera
-        // relacionamentos_avaliacao. Em qualquer outro caso (avaliacao_360 ou
-        // incerto), continua chamando, mesmo comportamento de hoje.
         if (pesquisaDoCiclo?.tipo !== 'clima_geral') {
           carregarRelacionamentos(id)
         }
@@ -265,19 +239,8 @@ export function CicloDetalhePage() {
   }, [id, carregarRelacionamentos, carregarEnvios])
 
   useEffect(() => {
-    // Carga inicial via API — não é dado derivável durante a renderização.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     carregar()
   }, [carregar])
-
-  /**
-   * Refresh manual: reaproveita `buscarCiclo` + `carregarEnvios`/
-   * `carregarRelacionamentos` (mesma condição de `carregar()`), sem
-   * refazer `listarParticipantes`/`listarPesquisas`/`listarColaboradores`/
-   * `listarEquipes` — fora do escopo (só formulários de adicionar
-   * participante/vincular pesquisa). Também reseta o baseline do polling e
-   * limpa a notificação de novas respostas.
-   */
   async function handleAtualizar() {
     if (!id) return
     setAtualizando(true)
@@ -305,15 +268,6 @@ export function CicloDetalhePage() {
     }
   }
 
-  /**
-   * Polling leve (só contagem, via `GET /api/ciclos/:id/progresso`) a cada
-   * 30s — nunca refaz a tabela completa, só compara `progresso.concluidos`
-   * contra o baseline pra decidir se avisa (notificação + som) sobre novas
-   * respostas. Erros de tick são silenciosos (não usam `snackbar`/
-   * `erroCarregamento`) — só tenta de novo no próximo tick. Cleanup do
-   * `setInterval` é obrigatório: para o polling ao desmontar a tela ou
-   * trocar de ciclo (`id` muda).
-   */
   useEffect(() => {
     if (!id) return
     const intervalId = window.setInterval(async () => {
@@ -328,7 +282,6 @@ export function CicloDetalhePage() {
           }
         }
       } catch {
-        // Tick de polling silencioso — falha não deve incomodar o usuário.
       }
     }, 30000)
 
@@ -350,14 +303,6 @@ export function CicloDetalhePage() {
     [pesquisas],
   )
 
-  /**
-   * Fonte de verdade do tipo de pesquisa desta página (ver "Decisões" no
-   * task-frontend.md, item 1): prioriza `pesquisaVinculada` (já carregada,
-   * síncrona com `ciclo`); cai para `tipoPesquisaEnvios` (do envelope de
-   * `listarEnvios`, autoritativo sobre o que foi de fato gerado) só se a
-   * pesquisa tiver sido desvinculada do ciclo depois da ativação — caso
-   * residual que a UI de hoje não permite, mas o backend não bloqueia.
-   */
   const tipoPesquisaCiclo = pesquisaVinculada?.tipo ?? tipoPesquisaEnvios
 
   async function handleAdicionarIndividual() {
@@ -413,17 +358,6 @@ export function CicloDetalhePage() {
     }
   }
 
-  /**
-   * Vincular/desvincular pesquisa usa exclusivamente `PUT /api/pesquisas/:id`
-   * (via `atualizarPesquisa`) — não existe (e não deve ser criada) rota
-   * equivalente em `ciclosService.ts`. A restrição "só vincular/desvincular
-   * com o ciclo em rascunho" (botões abaixo) é decisão de UX espelhada no
-   * backend: esse `PUT`, ao vincular (`cicloId` não nulo), valida tanto o
-   * status do ciclo (`409 CICLO_NAO_EDITAVEL` se não estiver em rascunho)
-   * quanto o da pesquisa (`409 PESQUISA_NAO_PUBLICADA` se a pesquisa não
-   * estiver publicada). Desvincular (`cicloId: null`) continua sempre
-   * permitido, independentemente do status de ambos.
-   */
   async function handleVincularPesquisa() {
     if (!ciclo || !pesquisaSelecionadaId) return
     setSalvandoPesquisa(true)
@@ -453,15 +387,6 @@ export function CicloDetalhePage() {
     }
   }
 
-  /**
-   * Ativação dispara a geração de `relacionamentos_avaliacao` no backend a
-   * partir dos participantes atuais — irreversível, por isso o
-   * `ConfirmDialog` abaixo é explícito sobre isso. O botão que aciona esta
-   * função já é gated por `ciclo.elegibilidadeAtivacao.elegivel`, que reflete
-   * as 3 regras completas do backend (participantes, pesquisa publicada
-   * vinculada e tipo de relacionamento selecionado) — nenhuma regra é
-   * duplicada aqui no cliente.
-   */
   async function handleConfirmarAtivar() {
     if (!ciclo) return
     setAtivando(true)
@@ -508,7 +433,6 @@ export function CicloDetalhePage() {
     }
   }
 
-  /** Atualiza o slot de state certo (envio de campanha único ou item da lista de avaliação 360), conforme o guard de origem do envio retornado. */
   function aplicarEnvioAtualizado(atualizado: EnvioPesquisaAcao) {
     if (ehEnvioCampanhaClima(atualizado)) {
       setEnvioCampanhaClima(atualizado)
@@ -886,8 +810,8 @@ export function CicloDetalhePage() {
               </Button>
             </div>
             <Typography variant="body2" color="text.secondary">
-              Controle manual de envio do link de resposta — o link é copiado e compartilhado pelo admin fora da
-              plataforma (e-mail, WhatsApp, etc.); esta tela só registra o status. Dado identificado — visível apenas
+              Controle manual de envio do link de resposta, o link é copiado e compartilhado pelo admin fora da
+              plataforma (e-mail, WhatsApp, etc.); esta tela só registra o status. Dado identificado, visível apenas
               para admin/gestor de RH.
             </Typography>
             <TableContainer component={Paper} variant="outlined">

@@ -8,12 +8,6 @@ interface GrupoParesSubordinadoCardProps {
   grupo: GrupoParesSubordinado
 }
 
-/**
- * Um bloco por avaliado + tipo de relacionamento (`pares`/`subordinado`).
- * `liberado`/`motivo`/`textos` já vêm prontos do backend — este componente
- * só lê `grupo.liberado` para decidir qual sub-estado renderizar, nunca
- * recalcula o gate.
- */
 export function GrupoParesSubordinadoCard({ grupo }: GrupoParesSubordinadoCardProps) {
   return (
     <Paper variant="outlined" className="flex flex-col gap-2 p-3">

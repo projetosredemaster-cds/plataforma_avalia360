@@ -13,12 +13,6 @@ interface StatusEnvioChipProps {
   status: StatusEnvio
 }
 
-/**
- * `em_andamento`/`concluido` nunca são produzidos por esta task (reservados
- * para a futura página `/responder`), mas o mapa cobre os 5 valores do
- * enum do backend por completude de tipo — não é um sinal de que a UI
- * trata esses 2 casos como alcançáveis hoje.
- */
 export function StatusEnvioChip({ status }: StatusEnvioChipProps) {
   const { label, color } = CONFIG[status]
   return <Chip label={label} color={color} size="small" />

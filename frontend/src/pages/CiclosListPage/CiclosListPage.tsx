@@ -30,16 +30,10 @@ type FiltroStatus = 'todas' | StatusCiclo
 
 const FORMATADOR_DATA = new Intl.DateTimeFormat('pt-BR')
 
-/** `'YYYY-MM-DD'` tratado como data local (nunca `new Date(data)` puro, que pode deslocar um dia por fuso). */
 function formatarData(data: string): string {
   return FORMATADOR_DATA.format(new Date(`${data}T00:00:00`))
 }
 
-/**
- * `GET /api/ciclos` não pagina/filtra no servidor — busca e filtro de status
- * desta tela são 100% client-side sobre o array completo, mesmo padrão de
- * `PesquisasListPage`.
- */
 export function CiclosListPage() {
   const navigate = useNavigate()
 
@@ -61,13 +55,6 @@ export function CiclosListPage() {
 
   const [ciclosComNovaResposta, setCiclosComNovaResposta] = useState<Set<string>>(new Set())
 
-  /**
-   * Atualiza baselines/badges de "nova resposta" a partir de uma lista de
-   * ciclos já carregada — reaproveitado tanto pela carga/recarga completa
-   * (`carregarCiclos`) quanto pelo polling silencioso abaixo. Toda a lógica
-   * de comparação baseline-vs-contagem-atual vive em
-   * `lib/progressoConhecidoCiclos.ts`, compartilhada com `CicloDetalhePage`.
-   */
   const processarProgressoConhecido = useCallback((dados: Ciclo[]) => {
     dados.forEach((ciclo) => inicializarBaselineSeAusente(ciclo.id, ciclo.progresso.concluidos))
     setCiclosComNovaResposta(
@@ -90,29 +77,15 @@ export function CiclosListPage() {
   }, [processarProgressoConhecido])
 
   useEffect(() => {
-    // Carga inicial dos ciclos via API — não é dado derivável durante a renderização.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     carregarCiclos()
   }, [carregarCiclos])
 
-  /**
-   * Polling leve a cada 30s — chama `listarCiclos()` direto (não
-   * `carregarCiclos()`, que liga `setCarregando(true)` e faria a lista
-   * inteira "piscar" com o skeleton a cada tick). Atualiza só os badges de
-   * "nova resposta" via `processarProgressoConhecido`; nunca chama
-   * `setCiclos`, então os cards (barra de progresso, status, etc.) só mudam
-   * quando o usuário efetivamente recarrega a lista — mesmo princípio do
-   * polling silencioso já usado em `CicloDetalhePage`. Erros de tick são
-   * silenciosos. Cleanup do `setInterval` para o polling ao desmontar a
-   * página (troca de rota).
-   */
   useEffect(() => {
     const intervalId = window.setInterval(async () => {
       try {
         const dados = await listarCiclos()
         processarProgressoConhecido(dados)
       } catch {
-        // Tick de polling silencioso — mesmo padrão do detalhe do ciclo.
       }
     }, 30000)
     return () => window.clearInterval(intervalId)
