@@ -1,5 +1,5 @@
 import { apiFetch } from '../lib/apiClient'
-import type { AvaliacoesAnalise, VisaoGeralAnalise } from '../types/analise'
+import type { AvaliacoesAnalise, RankingAnalise, VisaoGeralAnalise } from '../types/analise'
 
 export interface BuscarVisaoGeralAnaliseParams {
   de: string // 'YYYY-MM-DD'
@@ -34,4 +34,30 @@ export function buscarAvaliacoesAnalise(params: BuscarAvaliacoesAnaliseParams): 
   const query = new URLSearchParams({ de: params.de, ate: params.ate })
   if (params.cicloId) query.set('cicloId', params.cicloId)
   return apiFetch<AvaliacoesAnalise>(`/api/analise/avaliacoes?${query.toString()}`)
+}
+
+export interface BuscarRankingAnaliseParams {
+  cicloId: string // obrigatório — a página nunca chama esta função com cicloId vazio
+  modo?: 'avaliado' | 'equipe'
+  cargo?: string
+  equipeId?: string
+  ordenarPor?: 'likert' | 'matriz'
+  ordem?: 'asc' | 'desc'
+}
+
+/**
+ * `GET /api/analise/ranking` — identifica o avaliado (nome/id), NUNCA o
+ * avaliador de pares/subordinado; nota agregada com gate próprio, sinalizado
+ * só por booleanos (`paresInsuficiente`/`subordinadoInsuficiente`/
+ * `dadosInsuficientes*`), nunca por contagem. `cicloId` é obrigatório na API
+ * — quem garante que só é chamada com um ciclo selecionado é a página.
+ */
+export function buscarRankingAnalise(params: BuscarRankingAnaliseParams): Promise<RankingAnalise> {
+  const query = new URLSearchParams({ cicloId: params.cicloId })
+  if (params.modo) query.set('modo', params.modo)
+  if (params.cargo) query.set('cargo', params.cargo)
+  if (params.equipeId) query.set('equipeId', params.equipeId)
+  if (params.ordenarPor) query.set('ordenarPor', params.ordenarPor)
+  if (params.ordem) query.set('ordem', params.ordem)
+  return apiFetch<RankingAnalise>(`/api/analise/ranking?${query.toString()}`)
 }

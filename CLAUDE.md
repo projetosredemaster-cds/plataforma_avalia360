@@ -12,30 +12,48 @@ Plataforma de Avaliação 360° — uma plataforma single-tenant de avaliação 
 - `backend/` — Node.js + Express + TypeORM + Postgres (Supabase). Já tem `src/` real
   (não é mais greenfield): módulos `auth`, `colaboradores`, `equipes`, `competencias`,
   `pesquisas`, `paginas-pesquisa`, `perguntas`, `ciclos-avaliacao` (entidades
-  `CicloAvaliacao`/`RelacionamentoAvaliacao`), `ciclo-participantes`, `envios-pesquisa` e
-  `coleta-respostas-publica` implementados, com migrations, testes (Vitest) e scripts de
-  build/dev configurados. `coleta-respostas-publica` é a única rota pública da API
-  (`app.use('/api/publico', ...)`, montada em `app.ts` sem o middleware `autenticar`) —
-  fluxo de resposta a pesquisa via link + CPF, sem login, espelhado no frontend por
+  `CicloAvaliacao`/`RelacionamentoAvaliacao`), `ciclo-participantes`, `envios-pesquisa`,
+  `coleta-respostas-publica` e `analise` implementados, com migrations, testes (Vitest) e
+  scripts de build/dev configurados. `coleta-respostas-publica` é a única rota pública da
+  API (`app.use('/api/publico', ...)`, montada em `app.ts` sem o middleware `autenticar`)
+  — fluxo de resposta a pesquisa via link + CPF, sem login, espelhado no frontend por
   `ResponderPesquisaPage`. `respostas` e `respostas-clima` também já existem, mas só como
   módulos de entidade (`resposta.entity.ts`/`item-resposta.entity.ts` e
   `resposta-clima.entity.ts`/`item-resposta-clima.entity.ts`, sem `service`/`controller`/
   `module.ts` próprios) — gravados diretamente pelo service de `coleta-respostas-publica`.
-  Só a ESCRITA (coleta) está implementada: `respostas`/`itens_resposta` (avaliação 360) são
-  sempre gravados identificados via `envio_id`; `respostas_clima`/`itens_resposta_clima`
-  são estruturalmente anônimos (sem nenhuma FK de identidade). Uma primeira fatia de
-  LEITURA agregada já existe, mas é propositalmente restrita a contagem: o módulo
-  `ciclos-avaliacao` expõe `progresso: { total, concluidos, percentual }` (calculado por
+  Só a ESCRITA (coleta) está implementada nesses dois: `respostas`/`itens_resposta`
+  (avaliação 360) são sempre gravados identificados via `envio_id`;
+  `respostas_clima`/`itens_resposta_clima` são estruturalmente anônimos (sem nenhuma FK de
+  identidade). O módulo `ciclos-avaliacao` expõe uma fatia leve de leitura agregada,
+  restrita a contagem: `progresso: { total, concluidos, percentual }` (calculado por
   `calcularProgressoCiclo`/`buscarPesquisaVinculada` em `ciclos-avaliacao.service.ts`) em
   `GET /api/ciclos`, `GET /api/ciclos/:id` e num endpoint dedicado e leve para polling,
   `GET /api/ciclos/:id/progresso` — para avaliação 360, conta `relacionamentos_avaliacao`
   com resposta registrada via `envios_pesquisa`→`respostas`; para `clima_geral`, conta
   `ciclo_participantes.respondeu_em`. Sempre `COUNT`, nunca seleciona
-  `avaliador_id`/`avaliado_id`/`tipo_relacionamento` nem qualquer dado de
-  `itens_resposta`. Módulo futuro/greenfield de verdade continua sendo a leitura
-  IDENTIFICADA/agregada por competência e pergunta (inclusive a regra de anonimização de
-  pares/subordinado com o limiar de `minimo_respostas_pares` descrita abaixo) — nenhum
-  endpoint disso existe ainda.
+  `avaliador_id`/`avaliado_id`/`tipo_relacionamento` nem qualquer dado de `itens_resposta`.
+  A leitura IDENTIFICADA/agregada de verdade — a que antes era descrita aqui como módulo
+  futuro/greenfield — já existe no módulo `analise` (`/api/analise/*`, montado com
+  `autenticar` em `analise.module.ts`, nunca como rota pública; todo endpoint chama
+  `garantirPapel(ator, ['admin', 'gestor_rh'])` como primeira linha, sem bypass de papel em
+  nenhum gate): `GET /api/analise/visao-geral` (métricas agregadas por período — contagens,
+  taxa de resposta, tempo médio — sem quebra por avaliador/avaliado; `analise.service.ts`),
+  `GET /api/analise/avaliacoes` (texto aberto identificado para
+  `autoavaliacao`/`gestor`/`externo`; agrupado por avaliado+ciclo+tipo para
+  `pares`/`subordinado`, e por ciclo para `clima_geral`, liberado só quando
+  `totalRespondentes >= ciclos_avaliacao.minimo_respostas_pares` — abaixo disso retorna
+  `{ liberado: false, motivo: 'aguardando_minimo_respondentes' }`, nunca array parcial;
+  `analise-avaliacoes.service.ts`) e `GET /api/analise/ranking` (ranking por avaliado ou por
+  equipe, likert/matriz, mesmo gate de pares/subordinado — sem bypass de papel para
+  admin/gestor_rh — mais um limiar de 5 membros por equipe/métrica; nunca expõe nenhuma
+  contagem bruta de respondentes/membros no payload, só booleanos de insuficiência;
+  `analise-ranking.service.ts` — este arquivo é o mais recente dos três: teve o passo
+  `backend-developer` concluído mas ainda não passou por `backend-codereviewer`/
+  `test-engineer`, confira `.claude/tasks/analise-ranking/task-backend.md` antes de tratar
+  como fechado). Lógica compartilhada pelas três telas (universo de ciclos por período,
+  classificação avaliação_360/clima_geral, e o próprio gate de pares/subordinado) vive em
+  `analise-comum.ts`. Espelhado no frontend por `AnaliseVisaoGeralPage`,
+  `AnaliseAvaliacoesPage` e `AnaliseRankingPage`.
 
 Os agentes/skills do próprio repositório (`.claude/agents/*.md`, `.claude/skills/**/*.md`)
 se referem a estes diretórios como `apps/web` e `apps/api` — essa nomenclatura não existe

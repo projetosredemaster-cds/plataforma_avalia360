@@ -15,6 +15,7 @@ import { CicloDetalhePage } from './pages/CicloDetalhePage/CicloDetalhePage'
 import { ResponderPesquisaPage } from './pages/ResponderPesquisaPage/ResponderPesquisaPage'
 import { AnaliseVisaoGeralPage } from './pages/AnaliseVisaoGeralPage/AnaliseVisaoGeralPage'
 import { AnaliseAvaliacoesPage } from './pages/AnaliseAvaliacoesPage/AnaliseAvaliacoesPage'
+import { AnaliseRankingPage } from './pages/AnaliseRankingPage/AnaliseRankingPage'
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
           <Route path="/ciclos/:id" element={<CicloDetalhePage />} />
           <Route path="/analise/visao-geral" element={<AnaliseVisaoGeralPage />} />
           <Route path="/analise/avaliacoes" element={<AnaliseAvaliacoesPage />} />
+          <Route path="/analise/ranking" element={<AnaliseRankingPage />} />
         </Route>
       </Route>
 

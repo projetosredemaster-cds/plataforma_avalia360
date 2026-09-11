@@ -36,9 +36,9 @@ export function TextoAbertoLista({ textos }: TextoAbertoListaProps) {
               {grupo.perguntaEnunciado}
             </Typography>
           </Typography>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 bg-blue-50 border-blue-200 p-2">
             {grupo.textos.map((item, indice) => (
-              <Paper key={`${item.perguntaId}-${indice}`} variant="outlined" className="p-3">
+              <Paper key={`${item.perguntaId}-${indice}`} variant="outlined" className="p-6">
                 <Typography variant="body2" sx={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                   {item.texto}
                 </Typography>

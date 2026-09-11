@@ -10,14 +10,6 @@ interface SeletorCicloProps {
 
 const STATUS_SELECIONAVEIS = new Set<Ciclo['status']>(['ativo', 'encerrado'])
 
-/**
- * Select simples (sem busca interna) de ciclo — usado por `AnaliseVisaoGeralPage`
- * e `AnaliseAvaliacoesPage`. Só lista ciclos `ativo`/`encerrado` (nunca
- * `rascunho`). Trocar a seleção chama `onChange` imediatamente — quem decide o que
- * fazer com isso (novo fetch, `setSearchParams`) é a página, não este componente.
- * NUNCA chama `onChange` sozinho por conta de carregamento ou de um `cicloId`
- * (prop) que não esteja na lista — ver o `MenuItem` de fallback abaixo.
- */
 export function SeletorCiclo({ cicloId, onChange }: SeletorCicloProps) {
   const [ciclos, setCiclos] = useState<Ciclo[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -29,8 +21,6 @@ export function SeletorCiclo({ cicloId, onChange }: SeletorCicloProps) {
         if (!cancelado) setCiclos(todos.filter((c) => STATUS_SELECIONAVEIS.has(c.status)))
       })
       .catch(() => {
-        // Best-effort — falha aqui não deve quebrar a página; o filtro de ciclo
-        // simplesmente fica indisponível (só "Todos os ciclos" segue utilizável).
       })
       .finally(() => {
         if (!cancelado) setCarregando(false)
@@ -57,12 +47,7 @@ export function SeletorCiclo({ cicloId, onChange }: SeletorCicloProps) {
           {c.nome}
         </MenuItem>
       ))}
-      {/* `cicloId` (prop, vindo de deep link/URL) não está entre os ciclos
-          selecionáveis — ainda em carregamento, ou o ciclo está em `rascunho`
-          (CiclosListPage permite o deep link mesmo nesse status). Renderizado
-          desabilitado só para o <TextField select> ter uma opção correspondente
-          ao `value` atual e não "engolir" o filtro silenciosamente nem disparar
-          nenhum onChange — o usuário troca manualmente se quiser. */}
+      {}
       {cicloOrfao && (
         <MenuItem value={cicloId as string} disabled>
           {carregando ? 'Carregando…' : 'Ciclo selecionado indisponível para este filtro'}

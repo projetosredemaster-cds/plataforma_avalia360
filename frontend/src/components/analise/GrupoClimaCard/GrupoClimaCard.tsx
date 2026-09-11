@@ -7,13 +7,6 @@ interface GrupoClimaCardProps {
   grupo: GrupoClimaGeral
 }
 
-/**
- * Um bloco por ciclo de clima. `respostas_clima`/`itens_resposta_clima` são
- * estruturalmente anônimas (sem nenhuma FK de identidade) — os textos
- * liberados NUNCA têm nenhuma atribuição, nem agregada por pessoa (nada de
- * "Respondente 1"). Sem cabeçalho de avaliado (não existe, ao contrário de
- * `GrupoParesSubordinadoCard`).
- */
 export function GrupoClimaCard({ grupo }: GrupoClimaCardProps) {
   return (
     <Paper variant="outlined" className="flex flex-col gap-2 p-3">

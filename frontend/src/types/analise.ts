@@ -100,3 +100,59 @@ export interface AvaliacoesAnalise {
   }
   climaGeral: GrupoClimaGeral[]
 }
+
+// ---- "Ranking" (GET /api/analise/ranking) ----
+// Identifica o AVALIADO (avaliadoId/avaliadoNome) — esperado e correto, o
+// ranking é sobre quem está sendo avaliado. NUNCA identifica o AVALIADOR de
+// relações pares/subordinado — nenhum campo de nenhuma interface abaixo
+// carrega avaliadorId/nome de avaliador, e nenhum campo numérico de contagem
+// de respondentes/membros existe em nenhuma condição (só os booleanos abaixo).
+// `mediaLikert`/`mediaMatriz` já vêm normalizadas em percentual (0-100) e
+// arredondadas pelo backend — nunca recalculadas aqui. `posicao` já vem
+// calculada com semântica RANK() (empate = mesma posição) e com as linhas
+// sem nota (`media* === null` na métrica de ordenação) já posicionadas no
+// fim do array — nunca reordenar `linhas` no frontend.
+
+export type ModoRanking = 'avaliado' | 'equipe'
+export type MetricaRanking = 'likert' | 'matriz'
+export type OrdemRanking = 'asc' | 'desc'
+
+export interface RankingAvaliadoLinha {
+  posicao: number | null
+  avaliadoId: string
+  avaliadoNome: string
+  cargo: string | null
+  equipeNome: string | null
+  mediaLikert: number | null
+  mediaMatriz: number | null
+  paresInsuficiente: boolean
+  subordinadoInsuficiente: boolean
+}
+
+export interface RankingEquipeLinha {
+  posicao: number | null
+  equipeId: string
+  equipeNome: string
+  mediaLikert: number | null
+  mediaMatriz: number | null
+  dadosInsuficientesLikert: boolean
+  dadosInsuficientesMatriz: boolean
+}
+
+export interface RankingAvaliadoAnalise {
+  cicloId: string
+  modo: 'avaliado'
+  ordenarPor: MetricaRanking
+  ordem: OrdemRanking
+  linhas: RankingAvaliadoLinha[]
+}
+
+export interface RankingEquipeAnalise {
+  cicloId: string
+  modo: 'equipe'
+  ordenarPor: MetricaRanking
+  ordem: OrdemRanking
+  linhas: RankingEquipeLinha[]
+}
+
+export type RankingAnalise = RankingAvaliadoAnalise | RankingEquipeAnalise

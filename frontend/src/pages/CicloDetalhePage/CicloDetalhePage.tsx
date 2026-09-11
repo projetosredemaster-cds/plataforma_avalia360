@@ -753,8 +753,8 @@ export function CicloDetalhePage() {
               Vínculo estrutural de quem avalia quem, gerado automaticamente na ativação do ciclo. Dado identificado
               — visível apenas para admin/gestor de RH.
             </Typography>
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
+            <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 440, overflowY: 'auto' }}>
+              <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
                     <TableCell>Avaliador</TableCell>
@@ -814,8 +814,8 @@ export function CicloDetalhePage() {
               plataforma (e-mail, WhatsApp, etc.); esta tela só registra o status. Dado identificado, visível apenas
               para admin/gestor de RH.
             </Typography>
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
+            <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 440, overflowY: 'auto' }}>
+              <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
                     <TableCell>Avaliador</TableCell>
@@ -1050,8 +1050,8 @@ export function CicloDetalhePage() {
                   </div>
                 </Paper>
 
-                <TableContainer component={Paper} variant="outlined">
-                  <Table size="small">
+                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 440, overflowY: 'auto' }}>
+                  <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
                         <TableCell>Colaborador</TableCell>

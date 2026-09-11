@@ -10,7 +10,13 @@ import { CicloParticipante } from '../ciclo-participantes/ciclo-participante.ent
 import { EnvioPesquisa } from '../envios-pesquisa/envio-pesquisa.entity'
 import { Resposta } from '../respostas/resposta.entity'
 import { RespostaClima } from '../respostas-clima/resposta-clima.entity'
-import { PAPEIS_COM_ACESSO, buscarUniversoCiclos, classificarPorTipo, validarDataQuery } from './analise-comum'
+import {
+  PAPEIS_COM_ACESSO,
+  arredondar1,
+  buscarUniversoCiclos,
+  classificarPorTipo,
+  validarDataQuery,
+} from './analise-comum'
 
 export interface DistribuicaoTipoMetrica {
   totalCiclos: number
@@ -43,10 +49,6 @@ export interface BuscarVisaoGeralDto {
   de: unknown
   ate: unknown
   cicloId?: unknown
-}
-
-function arredondar1(valor: number): number {
-  return Math.round(valor * 10) / 10
 }
 
 function payloadZerado(periodo: { de: string; ate: string }, cicloId: string | null): VisaoGeralAnalise {

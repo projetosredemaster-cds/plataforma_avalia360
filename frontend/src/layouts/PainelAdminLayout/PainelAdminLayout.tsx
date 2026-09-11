@@ -61,7 +61,14 @@ const GRUPOS: MenuGroup[] = [
     icon: <AssessmentOutlinedIcon fontSize="small" />,
     tipo: 'submenus',
     submenus: [
-      { key: 'quantitativa', label: 'Quantitativa', opcoes: [{ label: 'Visão Geral', to: '/analise/visao-geral' }] },
+      {
+        key: 'quantitativa',
+        label: 'Quantitativa',
+        opcoes: [
+          { label: 'Visão Geral', to: '/analise/visao-geral' },
+          { label: 'Ranking', to: '/analise/ranking' },
+        ],
+      },
       { key: 'qualitativa', label: 'Qualitativa', opcoes: [{ label: 'Avaliações', to: '/analise/avaliacoes' }] },
     ],
   },

@@ -2,6 +2,9 @@ import { In } from 'typeorm'
 import { AppDataSource } from '../../data-source'
 import { ErroHttp } from '../../common/erro-http'
 import { CicloAvaliacao } from '../ciclos-avaliacao/ciclo-avaliacao.entity'
+import { RelacionamentoAvaliacao } from '../ciclos-avaliacao/relacionamento-avaliacao.entity'
+import { EnvioPesquisa } from '../envios-pesquisa/envio-pesquisa.entity'
+import { Resposta } from '../respostas/resposta.entity'
 import { Pesquisa } from '../pesquisas/pesquisa.entity'
 
 /**
@@ -98,4 +101,60 @@ export async function classificarPorTipo(
   const idsClima = idsUniverso.filter((id) => tipoPorCiclo.get(id) === 'clima_geral')
 
   return { idsAval360, idsClima }
+}
+
+export interface GateParesSubordinadoLinha {
+  avaliadoId: string
+  cicloId: string
+  tipoRelacionamento: 'pares' | 'subordinado'
+  totalRespondentes: number
+}
+
+/**
+ * GATE compartilhado por "Avaliações" e "Ranking": único uso permitido de
+ * avaliador_id no caminho pares/subordinado é DENTRO de
+ * COUNT(DISTINCT ...) — nunca projetado bruto (guard rail de anonimização,
+ * ver skill backend-anonimizacao-respostas). `periodo` é OPCIONAL:
+ * "Avaliações" sempre passa `{ de, ate }` (filtra resposta.respondido_em,
+ * mesmo comportamento de antes da extração, sem mudança); "Ranking" chama
+ * com `ids: [cicloId]` e SEM período (gate sobre o ciclo inteiro, já que
+ * Ranking não tem filtro de data).
+ */
+export async function calcularGateParesSubordinado(
+  ids: string[],
+  periodo?: PeriodoConsulta,
+): Promise<GateParesSubordinadoLinha[]> {
+  if (ids.length === 0) return []
+
+  const qb = AppDataSource.getRepository(RelacionamentoAvaliacao)
+    .createQueryBuilder('rel')
+    .innerJoin(EnvioPesquisa, 'envio', 'envio.relacionamento_id = rel.id')
+    .innerJoin(Resposta, 'resposta', 'resposta.envio_id = envio.id')
+    .select('rel.avaliado_id', 'avaliadoId')
+    .addSelect('rel.ciclo_id', 'cicloId')
+    .addSelect('rel.tipo_relacionamento', 'tipoRelacionamento')
+    .addSelect('COUNT(DISTINCT rel.avaliador_id)', 'totalRespondentes')
+    .where('rel.ciclo_id IN (:...ids)', { ids })
+    .andWhere('rel.tipo_relacionamento IN (:...tipos)', { tipos: ['pares', 'subordinado'] })
+    .groupBy('rel.avaliado_id')
+    .addGroupBy('rel.ciclo_id')
+    .addGroupBy('rel.tipo_relacionamento')
+
+  if (periodo) {
+    qb.andWhere('resposta.respondido_em::date BETWEEN :de::date AND :ate::date', periodo)
+  }
+
+  const linhas = await qb.getRawMany<{
+    avaliadoId: string
+    cicloId: string
+    tipoRelacionamento: 'pares' | 'subordinado'
+    totalRespondentes: string
+  }>()
+
+  return linhas.map((l) => ({ ...l, totalRespondentes: Number(l.totalRespondentes) }))
+}
+
+/** Mesmo `arredondar1` já usado por "Visão Geral" — compartilhado por "Ranking". */
+export function arredondar1(valor: number): number {
+  return Math.round(valor * 10) / 10
 }

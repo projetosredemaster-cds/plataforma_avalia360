@@ -14,8 +14,14 @@ import { RespostaClima } from '../respostas-clima/resposta-clima.entity'
 import { ItemRespostaClima } from '../respostas-clima/item-resposta-clima.entity'
 import { Pergunta } from '../perguntas/pergunta.entity'
 import { Colaborador } from '../colaboradores/colaborador.entity'
-import { PAPEIS_COM_ACESSO, buscarUniversoCiclos, classificarPorTipo, validarDataQuery } from './analise-comum'
-import type { PeriodoConsulta } from './analise-comum'
+import {
+  PAPEIS_COM_ACESSO,
+  buscarUniversoCiclos,
+  calcularGateParesSubordinado,
+  classificarPorTipo,
+  validarDataQuery,
+} from './analise-comum'
+import type { GateParesSubordinadoLinha, PeriodoConsulta } from './analise-comum'
 
 export interface TextoAbertoItem {
   perguntaId: string
@@ -75,13 +81,6 @@ export interface BuscarAvaliacoesDto {
   cicloId?: unknown
 }
 
-interface GateParesSubordinadoLinha {
-  avaliadoId: string
-  cicloId: string
-  tipoRelacionamento: 'pares' | 'subordinado'
-  totalRespondentes: number
-}
-
 interface GateClimaLinha {
   cicloId: string
   totalRespondentes: number
@@ -133,31 +132,6 @@ async function buscarIdentificadas360(
     .getRawMany<Omit<AvaliacaoIdentificada, 'nomeCiclo'>>()
 
   return linhas
-}
-
-async function calcularGateParesSubordinado(
-  ids: string[],
-  periodo: PeriodoConsulta,
-): Promise<GateParesSubordinadoLinha[]> {
-  if (ids.length === 0) return []
-
-  const linhas = await AppDataSource.getRepository(RelacionamentoAvaliacao)
-    .createQueryBuilder('rel')
-    .innerJoin(EnvioPesquisa, 'envio', 'envio.relacionamento_id = rel.id')
-    .innerJoin(Resposta, 'resposta', 'resposta.envio_id = envio.id')
-    .select('rel.avaliado_id', 'avaliadoId')
-    .addSelect('rel.ciclo_id', 'cicloId')
-    .addSelect('rel.tipo_relacionamento', 'tipoRelacionamento')
-    .addSelect('COUNT(DISTINCT rel.avaliador_id)', 'totalRespondentes')
-    .where('rel.ciclo_id IN (:...ids)', { ids })
-    .andWhere('rel.tipo_relacionamento IN (:...tipos)', { tipos: ['pares', 'subordinado'] })
-    .andWhere('resposta.respondido_em::date BETWEEN :de::date AND :ate::date', periodo)
-    .groupBy('rel.avaliado_id')
-    .addGroupBy('rel.ciclo_id')
-    .addGroupBy('rel.tipo_relacionamento')
-    .getRawMany<{ avaliadoId: string; cicloId: string; tipoRelacionamento: 'pares' | 'subordinado'; totalRespondentes: string }>()
-
-  return linhas.map((l) => ({ ...l, totalRespondentes: Number(l.totalRespondentes) }))
 }
 
 async function buscarTextosParesSubordinado(
