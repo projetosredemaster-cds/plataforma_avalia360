@@ -69,7 +69,14 @@ const GRUPOS: MenuGroup[] = [
           { label: 'Ranking', to: '/analise/ranking' },
         ],
       },
-      { key: 'qualitativa', label: 'Qualitativa', opcoes: [{ label: 'Avaliações', to: '/analise/avaliacoes' }] },
+      {
+        key: 'qualitativa',
+        label: 'Qualitativa',
+        opcoes: [
+          { label: 'Avaliações', to: '/analise/avaliacoes' },
+          { label: 'Nuvem de Palavras', to: '/analise/nuvem-palavras' },
+        ],
+      },
     ],
   },
   {

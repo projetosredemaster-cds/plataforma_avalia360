@@ -1,5 +1,5 @@
 import { apiFetch } from '../lib/apiClient'
-import type { AvaliacoesAnalise, RankingAnalise, VisaoGeralAnalise } from '../types/analise'
+import type { AvaliacoesAnalise, NuvemPalavrasAnalise, RankingAnalise, VisaoGeralAnalise } from '../types/analise'
 
 export interface BuscarVisaoGeralAnaliseParams {
   de: string // 'YYYY-MM-DD'
@@ -60,4 +60,25 @@ export function buscarRankingAnalise(params: BuscarRankingAnaliseParams): Promis
   if (params.ordenarPor) query.set('ordenarPor', params.ordenarPor)
   if (params.ordem) query.set('ordem', params.ordem)
   return apiFetch<RankingAnalise>(`/api/analise/ranking?${query.toString()}`)
+}
+
+export interface BuscarNuvemPalavrasAnaliseParams {
+  de: string // 'YYYY-MM-DD'
+  ate: string // 'YYYY-MM-DD'
+  cicloId?: string
+}
+
+/**
+ * `GET /api/analise/nuvem-palavras` — dado 100% agregado (frequência de
+ * palavras + métricas complementares), nunca identificado. `de`/`ate` são
+ * sempre obrigatórios (sem default no backend); `cicloId` é opcional, mesmo
+ * padrão de `buscarAvaliacoesAnalise`. `palavras` já vem ordenada/cortada
+ * pelo backend — esta função só transporta, não reordena.
+ */
+export function buscarNuvemPalavrasAnalise(
+  params: BuscarNuvemPalavrasAnaliseParams,
+): Promise<NuvemPalavrasAnalise> {
+  const query = new URLSearchParams({ de: params.de, ate: params.ate })
+  if (params.cicloId) query.set('cicloId', params.cicloId)
+  return apiFetch<NuvemPalavrasAnalise>(`/api/analise/nuvem-palavras?${query.toString()}`)
 }

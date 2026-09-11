@@ -156,3 +156,32 @@ export interface RankingEquipeAnalise {
 }
 
 export type RankingAnalise = RankingAvaliadoAnalise | RankingEquipeAnalise
+
+// ---- "Nuvem de Palavras" (GET /api/analise/nuvem-palavras) ----
+// Payload 100% agregado — mais simples que os três blocos acima: NENHUM
+// campo identifica avaliador, avaliado, ciclo (por palavra) ou tipo de
+// relacionamento. `palavras` já vem ordenada por `frequencia` decrescente
+// (top 50) pelo backend — NUNCA reordenar/filtrar no frontend. `metricas`
+// reaproveita o mesmo shape de tempo médio já usado por `VisaoGeralAnalise`
+// (`TempoMedioComponente`), mas é um subconjunto próprio (só
+// totalEnvios/totalRespostas/tempoMedioResposta) — não confundir com
+// `VisaoGeralAnalise.tempoMedioResposta`, que tem quebra por tipo de
+// pesquisa (esta feature não tem).
+
+export interface PalavraFrequencia {
+  palavra: string
+  frequencia: number
+}
+
+export interface MetricasComplementaresNuvem {
+  totalEnvios: number
+  totalRespostas: number
+  tempoMedioResposta: TempoMedioComponente
+}
+
+export interface NuvemPalavrasAnalise {
+  periodo: { de: string; ate: string }
+  cicloId: string | null
+  palavras: PalavraFrequencia[]
+  metricas: MetricasComplementaresNuvem
+}

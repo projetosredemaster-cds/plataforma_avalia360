@@ -56,8 +56,10 @@ export function LoginPage() {
     <Box
       className="flex min-h-svh items-center justify-center p-4 sm:p-8"
       sx={{
-        background: (t) =>
-          `linear-gradient(160deg, ${t.palette.cream.main} 0%, ${t.palette.info.main} 100%)`,
+        background: "url('/wallpaper-login.jpeg')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
       }}
     >
       <Paper
@@ -76,7 +78,7 @@ export function LoginPage() {
         >
           <Box
             component="img"
-            src="/imagem-tela-login.png"
+            src="/imagem.png"
             alt="Ilustração de colaborador acessando a plataforma Avalia360"
             sx={{
               position: 'absolute',
@@ -90,9 +92,9 @@ export function LoginPage() {
           />
         </Box>
 
-        <Box className="flex flex-1 items-center justify-center p-8" sx={{ bgcolor: 'background.paper' }}>
+        <Box className="flex flex-1 items-center justify-center p-8" sx={{ bgcolor: '#D2ECFA' }}>
           <div className="flex w-full max-w-[380px] flex-col items-center">
-            <img src="/logo.jpg" alt="Avalia360" className="mb-8 w-[320px]" />
+            <img src="/logo.png" alt="Avalia360" className="mb-8 w-[320px]" />
 
             <form onSubmit={handleSubmit} noValidate className="flex w-full flex-col gap-4">
               {successMsg && (
@@ -109,6 +111,13 @@ export function LoginPage() {
                 disabled={loading}
                 autoComplete="email"
                 fullWidth
+                sx={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '12px',
+                    '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                  },
+                }}
               />
               <TextField
                 id="login-senha"
@@ -119,6 +128,13 @@ export function LoginPage() {
                 disabled={loading}
                 autoComplete="current-password"
                 fullWidth
+                sx={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '12px',
+                    '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                  },
+                }}
                 slotProps={{
                   input: {
                     endAdornment: (
@@ -156,12 +172,12 @@ export function LoginPage() {
               <Button
                 type="button"
                 variant="text"
-                color="primary"
                 onClick={() => setModalOpen(true)}
                 sx={{
+                  color: 'unset',
+                  fontStyle: 'oblique',
                   alignSelf: 'center',
-                  textDecoration: 'underline',
-                  '&:hover': { color: 'secondary.main', backgroundColor: 'transparent' },
+                  '&:hover': { color:  '#ffffff', backgroundColor: 'transparent' },
                 }}
               >
                 Esqueci minha senha

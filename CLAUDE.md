@@ -43,17 +43,29 @@ Plataforma de Avaliação 360° — uma plataforma single-tenant de avaliação 
   `pares`/`subordinado`, e por ciclo para `clima_geral`, liberado só quando
   `totalRespondentes >= ciclos_avaliacao.minimo_respostas_pares` — abaixo disso retorna
   `{ liberado: false, motivo: 'aguardando_minimo_respondentes' }`, nunca array parcial;
-  `analise-avaliacoes.service.ts`) e `GET /api/analise/ranking` (ranking por avaliado ou por
+  `analise-avaliacoes.service.ts`), `GET /api/analise/ranking` (ranking por avaliado ou por
   equipe, likert/matriz, mesmo gate de pares/subordinado — sem bypass de papel para
   admin/gestor_rh — mais um limiar de 5 membros por equipe/métrica; nunca expõe nenhuma
   contagem bruta de respondentes/membros no payload, só booleanos de insuficiência;
-  `analise-ranking.service.ts` — este arquivo é o mais recente dos três: teve o passo
-  `backend-developer` concluído mas ainda não passou por `backend-codereviewer`/
-  `test-engineer`, confira `.claude/tasks/analise-ranking/task-backend.md` antes de tratar
-  como fechado). Lógica compartilhada pelas três telas (universo de ciclos por período,
-  classificação avaliação_360/clima_geral, e o próprio gate de pares/subordinado) vive em
-  `analise-comum.ts`. Espelhado no frontend por `AnaliseVisaoGeralPage`,
-  `AnaliseAvaliacoesPage` e `AnaliseRankingPage`.
+  `analise-ranking.service.ts` — teve o passo `backend-developer` concluído mas ainda não
+  passou por `backend-codereviewer`/`test-engineer`, confira
+  `.claude/tasks/analise-ranking/task-backend.md` antes de tratar como fechado) e
+  `GET /api/analise/nuvem-palavras` (a mais recente das quatro, já com
+  `backend-codereviewer`/`test-engineer` concluídos — frequência agregada de palavras dos
+  mesmos textos `texto_aberto` já usados em "Avaliações", nunca o texto original exibido;
+  mesmo gate de liberação aplicado antes de buscar o texto no banco — nunca
+  buscar-depois-filtrar; stopwords em português + lowercase + piso de 3+ caracteres, top 50
+  por frequência decrescente, contagem unificada por ciclo/período sem segmentar por
+  pergunta; só visualização em LISTA nesta rodada — Bolhas e modo TV Dash ficam para
+  rodadas futuras, mas o contrato de resposta já foi desenhado para reaproveitamento por
+  elas sem mudar de shape; `analise-nuvem-palavras.service.ts`). Lógica compartilhada pelas
+  quatro telas (universo de ciclos por período, classificação avaliação_360/clima_geral, o
+  gate de pares/subordinado, e também as contagens/cálculo de tempo médio e
+  `calcularMetricasComplementares` reaproveitados por Visão Geral e Nuvem de Palavras) vive
+  em `analise-comum.ts`. Espelhado no frontend por `AnaliseVisaoGeralPage`,
+  `AnaliseAvaliacoesPage`, `AnaliseRankingPage` e `AnaliseNuvemPalavrasPage` — todas sem
+  atalho no card do Ciclo, acessíveis só pelo menu lateral (Análises → Quantitativa para
+  Visão Geral/Ranking, Análises → Qualitativa para Avaliações/Nuvem de Palavras).
 
 Os agentes/skills do próprio repositório (`.claude/agents/*.md`, `.claude/skills/**/*.md`)
 se referem a estes diretórios como `apps/web` e `apps/api` — essa nomenclatura não existe
@@ -159,9 +171,13 @@ para aquele avaliado + ciclo + tipo atingir `ciclos_avaliacao.minimo_respostas_p
 (padrão 3). Respostas do tipo `autoavaliacao`, `gestor` e `externo` podem ser
 identificadas. RH/admin sempre têm a visão identificada completa. Nunca escreva uma
 query/endpoint acessível por `colaborador` que junte `itens_resposta` com
-`relacionamentos_avaliacao.avaliador_id` para linhas `pares`/`subordinado` — use (ou
-replique a separação de) as views `respostas_identificadas` e
-`respostas_pares_agregadas`. Abaixo do mínimo, retorne um estado explícito (ex.:
+`relacionamentos_avaliacao.avaliador_id` para linhas `pares`/`subordinado` — replique a
+separação de `respostas_identificadas`/`respostas_pares_agregadas` (nomes de views
+definidas só em `docs/schema_avaliacao360_pt_v2.sql`; nenhuma migration real chegou a
+criá-las — o módulo `analise` implementa essa mesma separação diretamente em TypeORM,
+gate primeiro via `calcularGateParesSubordinado`/`calcularGateClima` em
+`analise-comum.ts`, busca de texto só depois, nunca buscar-depois-filtrar). Abaixo do
+mínimo, retorne um estado explícito (ex.:
 `{ liberado: false, motivo: "aguardando_minimo_respondentes" }`), nunca um array
 vazio/parcial.
 
@@ -200,16 +216,20 @@ src/modules/<nome>/
   em português de tabela/coluna do schema (ex.: `colaboradores`, `equipes`,
   `competencias`, `pesquisas`, `paginas_pesquisa`, `perguntas`,
   `perguntas_competencias`, `ciclos_avaliacao`, `relacionamentos_avaliacao`,
-  `ciclo_participantes`, `envios_pesquisa`) — nunca traduzir de volta para inglês nem
-  inventar nomes. Para módulos ainda não implementados (`respostas`, `itens_resposta`),
-  `docs/schema_avaliacao360_pt_v2.sql` é a referência; para os já implementados, a
-  migration existente é a referência de fato (ver seção "Projeto" sobre a divergência
-  conhecida no módulo `perguntas`).
+  `ciclo_participantes`, `envios_pesquisa`, `respostas`, `itens_resposta`,
+  `respostas_clima`, `itens_resposta_clima`) — nunca traduzir de volta para inglês nem
+  inventar nomes. Para toda tabela/coluna já criada por uma migration em
+  `backend/src/migrations/` — o que hoje cobre todos os módulos listados na seção
+  "Projeto", incluindo `respostas`/`itens_resposta`/`respostas_clima`/
+  `itens_resposta_clima` (mesmo só com a escrita implementada) — a migration é a
+  referência de fato; `docs/schema_avaliacao360_pt_v2.sql` só vale como referência para
+  tabela/coluna que ainda não tenha nenhuma migration correspondente (ver seção "Projeto"
+  sobre a divergência conhecida no módulo `perguntas`).
 - Enums do Postgres (`papel_colaborador`, `tipo_pergunta`, `status_pesquisa`,
-  `status_ciclo`, `tipo_relacionamento` e `status_envio` já existem) mapeiam para union
-  types TypeScript (`src/common/enums.ts`, ver `PapelColaborador`) com os mesmos valores
-  em português — não usar `enum` nominal do TS para evitar atrito com union types
-  usados em DTOs/tipos de request.
+  `status_ciclo`, `tipo_relacionamento`, `status_envio` e `tipo_pesquisa` já existem)
+  mapeiam para union types TypeScript (`src/common/enums.ts`, ver `PapelColaborador`) com
+  os mesmos valores em português — não usar `enum` nominal do TS para evitar atrito com
+  union types usados em DTOs/tipos de request.
 - Nunca depender de `synchronize: true` para mudanças de schema — toda mudança de schema
   precisa de uma migration com `up`/`down` (`src/migrations/`).
 - Checagens de autorização por papel ficam centralizadas na camada de serviço via
@@ -249,7 +269,7 @@ src/modules/<nome>/
   `valor` + `onChange` via props e nunca chamam a API diretamente — a página/formulário
   pai persiste. Componentes de resposta devem bloquear o envio quando `obrigatoria` não
   for atendida.
-- Assets estáticos referenciados por URL (`/logo.jpg`, `/imagem-tela-login.jpg`) ficam em
+- Assets estáticos referenciados por URL (`/logo.jpg`, `/imagem-tela-login.png`) ficam em
   `public/`, não importados de `src/assets`.
 - Nenhuma regra de negócio sensível (agregação, anonimização) no frontend — precisa vir
   pré-computada da API. Se a fonte de dados de uma tela de resultados não estiver
