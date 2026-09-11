@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Button, IconButton, InputAdornment, TextField, Typography } from '@mui/material'
+import { Box, Button, IconButton, InputAdornment, Paper, TextField, Typography } from '@mui/material'
 import { Visibility, VisibilityOff } from '@mui/icons-material'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
@@ -53,96 +53,125 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh">
-      <div className="hidden min-[900px]:flex flex-1 items-center justify-center bg-white">
-        <img
-          src="/imagem-tela-login.jpg"
-          alt="Ilustração de colaborador acessando a plataforma Avalia360"
-          className="block max-w-[60%] max-h-[80%] object-contain"
-        />
-      </div>
+    <Box
+      className="flex min-h-svh items-center justify-center p-4 sm:p-8"
+      sx={{
+        background: (t) =>
+          `linear-gradient(160deg, ${t.palette.cream.main} 0%, ${t.palette.info.main} 100%)`,
+      }}
+    >
+      <Paper
+        elevation={4}
+        className="flex w-full max-w-[960px] flex-col min-[900px]:flex-row"
+        sx={{ overflow: 'hidden' }}
+      >
+        <Box
+          className="hidden min-[900px]:flex flex-1"
+          sx={{
+            background: (t) =>
+              `linear-gradient(135deg, ${t.palette.primary.main} 0%, ${t.palette.secondary.main} 100%)`,
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <Box
+            component="img"
+            src="/imagem-tela-login.png"
+            alt="Ilustração de colaborador acessando a plataforma Avalia360"
+            sx={{
+              position: 'absolute',
+              left: 0,
+              bottom: 0,
+              width: 'auto',
+              height: '115%',
+              maxWidth: 'none',
+              objectFit: 'contain',
+            }}
+          />
+        </Box>
 
-      <div className="flex flex-1 items-center justify-center pr-8">
-        <div className="flex w-full max-w-[380px] flex-col items-center">
-          <img src="/logo.jpg" alt="Avalia360" className="mb-8 w-[320px]" />
+        <Box className="flex flex-1 items-center justify-center p-8" sx={{ bgcolor: 'background.paper' }}>
+          <div className="flex w-full max-w-[380px] flex-col items-center">
+            <img src="/logo.jpg" alt="Avalia360" className="mb-8 w-[320px]" />
 
-          <form onSubmit={handleSubmit} noValidate className="flex w-full flex-col gap-4">
-            {successMsg && (
-              <Typography role="status" color="success.main" variant="body2" sx={{ textAlign: 'left' }}>
-                {successMsg}
-              </Typography>
-            )}
-            <TextField
-              id="login-email"
-              label="E-mail"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-              autoComplete="email"
-              fullWidth
-            />
-            <TextField
-              id="login-senha"
-              label="Senha"
-              type={mostrarSenha ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              autoComplete="current-password"
-              fullWidth
-              slotProps={{
-                input: {
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
-                        onClick={() => setMostrarSenha((prev) => !prev)}
-                        edge="end"
-                      >
-                        {mostrarSenha ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
+            <form onSubmit={handleSubmit} noValidate className="flex w-full flex-col gap-4">
+              {successMsg && (
+                <Typography role="status" color="success.main" variant="body2" sx={{ textAlign: 'left' }}>
+                  {successMsg}
+                </Typography>
+              )}
+              <TextField
+                id="login-email"
+                label="E-mail"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                autoComplete="email"
+                fullWidth
+              />
+              <TextField
+                id="login-senha"
+                label="Senha"
+                type={mostrarSenha ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                autoComplete="current-password"
+                fullWidth
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                          onClick={() => setMostrarSenha((prev) => !prev)}
+                          edge="end"
+                        >
+                          {mostrarSenha ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
 
-            {errorMsg && (
-              <Typography role="alert" color="error" variant="body2" sx={{ textAlign: 'left' }}>
-                {errorMsg}
-              </Typography>
-            )}
+              {errorMsg && (
+                <Typography role="alert" color="error" variant="body2" sx={{ textAlign: 'left' }}>
+                  {errorMsg}
+                </Typography>
+              )}
 
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              disabled={loading}
-              size="large"
-              sx={{ mt: 1 }}
-            >
-              {loading ? 'Entrando...' : 'Entrar'}
-            </Button>
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                disabled={loading}
+                size="large"
+                sx={{ mt: 1 }}
+              >
+                {loading ? 'Entrando...' : 'Entrar'}
+              </Button>
 
-            <Button
-              type="button"
-              variant="text"
-              color="primary"
-              onClick={() => setModalOpen(true)}
-              sx={{
-                alignSelf: 'center',
-                textDecoration: 'underline',
-                '&:hover': { color: 'secondary.main', backgroundColor: 'transparent' },
-              }}
-            >
-              Esqueci minha senha
-            </Button>
-          </form>
-        </div>
-      </div>
+              <Button
+                type="button"
+                variant="text"
+                color="primary"
+                onClick={() => setModalOpen(true)}
+                sx={{
+                  alignSelf: 'center',
+                  textDecoration: 'underline',
+                  '&:hover': { color: 'secondary.main', backgroundColor: 'transparent' },
+                }}
+              >
+                Esqueci minha senha
+              </Button>
+            </form>
+          </div>
+        </Box>
+      </Paper>
 
       <EsqueciSenhaModal open={modalOpen} onClose={() => setModalOpen(false)} />
-    </div>
+    </Box>
   )
 }

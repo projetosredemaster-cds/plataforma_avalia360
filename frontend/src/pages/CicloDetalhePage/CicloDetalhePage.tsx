@@ -578,8 +578,8 @@ export function CicloDetalhePage() {
         <CardContent className="flex flex-col gap-4">
           <Typography variant="subtitle1">Participantes</Typography>
 
-          <TableContainer component={Paper} variant="outlined">
-            <Table size="small">
+          <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 440, overflowY: 'auto' }}>
+            <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
                   <TableCell>Nome</TableCell>

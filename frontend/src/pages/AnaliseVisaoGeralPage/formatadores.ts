@@ -9,10 +9,27 @@ export function formatarPercentual(valor: number): string {
   return `${FORMATADOR_NUMERO.format(valor)}%`
 }
 
-export function formatarHoras(horas: number): string {
+export function formatarTempoMedio(horas: number): string {
   if (horas <= 0) return '—'
-  if (horas < 24) return `${FORMATADOR_NUMERO.format(horas)} h`
-  return `${FORMATADOR_NUMERO.format(horas / 24)} d`
+
+  const totalMinutos = Math.round(horas * 60)
+
+  if (totalMinutos < 60) {
+    return `${totalMinutos}min`
+  }
+
+  const dias = Math.floor(totalMinutos / 1440)
+  const horasRestantes = Math.floor((totalMinutos % 1440) / 60)
+  const minutosRestantes = totalMinutos % 60
+
+  if (totalMinutos < 1440) {
+    return minutosRestantes === 0 ? `${horasRestantes}h` : `${horasRestantes}h ${minutosRestantes}min`
+  }
+
+  const partes = [`${dias}d`]
+  if (horasRestantes > 0) partes.push(`${horasRestantes}h`)
+  if (minutosRestantes > 0) partes.push(`${minutosRestantes}min`)
+  return partes.join(' ')
 }
 
 export function inicioAnoCorrenteYMD(): string {

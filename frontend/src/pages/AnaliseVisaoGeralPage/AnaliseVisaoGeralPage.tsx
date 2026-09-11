@@ -6,7 +6,7 @@ import { SeletorCiclo } from '../../components/analise/SeletorCiclo/SeletorCiclo
 import { ApiError } from '../../lib/apiClient'
 import { buscarVisaoGeralAnalise } from '../../services/analiseService'
 import type { VisaoGeralAnalise } from '../../types/analise'
-import { formatarHoras, formatarInteiro, formatarPercentual, hojeYMD, inicioAnoCorrenteYMD } from './formatadores'
+import { formatarTempoMedio, formatarInteiro, formatarPercentual, hojeYMD, inicioAnoCorrenteYMD } from './formatadores'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 
 export function AnaliseVisaoGeralPage() {
@@ -170,13 +170,13 @@ export function AnaliseVisaoGeralPage() {
               />
               <MetricaCard
                 titulo="Tempo médio de resposta"
-                valor={formatarHoras(dados.tempoMedioResposta.geral.horas)}
+                valor={formatarTempoMedio(dados.tempoMedioResposta.geral.horas)}
                 descricao={`${formatarInteiro(dados.tempoMedioResposta.geral.amostras)} respostas com tempo registrado`}
                 detalhes={[
-                  { rotulo: 'Avaliação 360', valor: formatarHoras(dados.tempoMedioResposta.avaliacao_360.horas) },
-                  { rotulo: 'Clima e Satisfação', valor: formatarHoras(dados.tempoMedioResposta.clima_geral.horas) },
+                  { rotulo: 'Avaliação 360', valor: formatarTempoMedio(dados.tempoMedioResposta.avaliacao_360.horas) },
+                  { rotulo: 'Clima e Satisfação', valor: formatarTempoMedio(dados.tempoMedioResposta.clima_geral.horas) },
                 ]}
-                tooltip="Tempo médio entre o momento em que o link da pesquisa foi enviado e o momento em que a pessoa respondeu, calculado com base em todas as respostas do período selecionado. Exibido em horas quando menor que 24 horas, ou em dias quando 24 horas ou mais."
+                tooltip="Este indicador mostra o tempo médio que as pessoas levam para responder à pesquisa assim que recebem o link. Para facilitar a leitura, o valor se adapta automaticamente: mostra apenas em minutos quando leva menos de uma hora, em horas e minutos para prazos de até um dia, e em dias, horas e minutos quando ultrapassa 24 horas."
               />
             </div>
           </div>
