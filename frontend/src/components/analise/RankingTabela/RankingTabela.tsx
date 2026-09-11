@@ -73,8 +73,8 @@ export function RankingTabela({ dados, onOrdenarPorChange }: RankingTabelaProps)
   }
 
   return (
-    <TableContainer>
-      <Table size="small">
+    <TableContainer sx={{ maxHeight: 560, overflowY: 'auto' }}>
+      <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>
             <TableCell>Posição</TableCell>

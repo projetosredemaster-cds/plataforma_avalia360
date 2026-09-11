@@ -18,7 +18,7 @@ export function ListaFrequenciaPalavras({ palavras }: ListaFrequenciaPalavrasPro
   const frequenciaMaxima = palavras.length > 0 ? Math.max(...palavras.map((item) => item.frequencia)) : 0
 
   return (
-    <TableContainer>
+    <TableContainer sx={{ maxHeight: 560, overflowY: 'auto' }}>
       <Table size="small">
         <TableBody>
           {palavras.map((item) => {

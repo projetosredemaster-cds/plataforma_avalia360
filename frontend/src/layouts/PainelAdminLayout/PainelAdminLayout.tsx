@@ -17,6 +17,7 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined'
 import PersonOutlineIcon from '@mui/icons-material/PersonOutlineOutlined'
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
@@ -27,6 +28,10 @@ import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined'
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import BarChartIcon from '@mui/icons-material/BarChart'
+import ForumIcon from '@mui/icons-material/Forum'
+import LeaderboardIcon from '@mui/icons-material/Leaderboard'
+import CloudIcon from '@mui/icons-material/Cloud'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
@@ -42,6 +47,7 @@ type SubmenuOpcao = {
   label: string
   disabled?: boolean
   to?: string
+  icon: React.ReactNode
 }
 
 type Submenu = {
@@ -65,16 +71,16 @@ const GRUPOS: MenuGroup[] = [
         key: 'quantitativa',
         label: 'Quantitativa',
         opcoes: [
-          { label: 'Visão Geral', to: '/analise/visao-geral' },
-          { label: 'Ranking', to: '/analise/ranking' },
+          { label: 'Visão Geral', to: '/analise/visao-geral', icon: <BarChartIcon fontSize="small" /> },
+          { label: 'Ranking', to: '/analise/ranking', icon: <LeaderboardIcon fontSize="small" /> },
         ],
       },
       {
         key: 'qualitativa',
         label: 'Qualitativa',
         opcoes: [
-          { label: 'Avaliações', to: '/analise/avaliacoes' },
-          { label: 'Nuvem de Palavras', to: '/analise/nuvem-palavras' },
+          { label: 'Avaliações', to: '/analise/avaliacoes', icon: <ForumIcon fontSize="small" /> },
+          { label: 'Nuvem de Palavras', to: '/analise/nuvem-palavras', icon: <CloudIcon fontSize="small" /> },
         ],
       },
     ],
@@ -218,7 +224,10 @@ export function PainelAdminLayout() {
                             onMouseEnter={(event) => abrirSubmenu(submenu.key, event.currentTarget)}
                             onMouseLeave={agendarFechamentoSubmenu}
                           >
-                            <ListItemText primary={submenu.label} />
+                            <ListItemText
+                              primary={submenu.label}
+                              slotProps={{ primary: { sx: { fontWeight: 600 } } }}
+                            />
                           </ListItemButton>
                         ))}
                     </List>
@@ -234,8 +243,8 @@ export function PainelAdminLayout() {
                           onMouseEnter={cancelarFechamentoSubmenu}
                           onMouseLeave={agendarFechamentoSubmenu}
                         >
-                          <Paper elevation={4} sx={{ borderRadius: 2, ml: 0.5, minWidth: 160 }}>
-                            <MenuList dense>
+                          <Paper elevation={4} sx={{ borderRadius: 2, ml: 0.5, minWidth: 190 }}>
+                            <MenuList>
                               {submenu.opcoes.map((opcao) =>
                                 opcao.to ? (
                                   <MuiMenuItem
@@ -243,11 +252,32 @@ export function PainelAdminLayout() {
                                     component={NavLink}
                                     to={opcao.to}
                                     onClick={() => setSubmenuAberto(null)}
+                                    sx={{
+                                      gap: 1,
+                                      py: 1.25,
+                                      px: 2,
+                                      borderRadius: 2,
+                                      fontSize: '0.9rem',
+                                      '&:hover': {
+                                        backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
+                                      },
+                                      '&.active': {
+                                        fontWeight: 700,
+                                        color: 'primary.main',
+                                        backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.14),
+                                      },
+                                    }}
                                   >
+                                    <ListItemIcon sx={{ minWidth: 30, color: 'inherit' }}>{opcao.icon}</ListItemIcon>
                                     {opcao.label}
                                   </MuiMenuItem>
                                 ) : (
-                                  <MuiMenuItem key={opcao.label} disabled={opcao.disabled}>
+                                  <MuiMenuItem
+                                    key={opcao.label}
+                                    disabled={opcao.disabled}
+                                    sx={{ gap: 1, py: 1.25, px: 2, borderRadius: 2, fontSize: '0.9rem' }}
+                                  >
+                                    <ListItemIcon sx={{ minWidth: 30 }}>{opcao.icon}</ListItemIcon>
                                     {opcao.label}
                                   </MuiMenuItem>
                                 ),

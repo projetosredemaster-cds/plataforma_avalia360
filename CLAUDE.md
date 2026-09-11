@@ -279,3 +279,13 @@ src/modules/<nome>/
   `import.meta.env.VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` — nunca hardcodear
   esses valores. `frontend/.env.example` é intencionalmente versionado (com
   placeholders vazios); o `.env` real permanece no gitignore.
+- Qualquer lista que pode crescer com volume de dados variável (não um número fixo
+  pequeno de itens, tipo um cabeçalho fixo de poucas colunas) deve ter altura máxima
+  com rolagem interna (`overflow-y: auto` + `maxHeight`, tipicamente 500-600px) em vez
+  de crescer livremente e empurrar o resto da página — exceto quando a lista já tem
+  paginação (client-side ou vinda da API), que já resolve o mesmo problema. Em
+  container MUI (`TableContainer`, `Box`, `Paper`, `List`), aplique via `sx`; em `div`
+  puro de layout, classes Tailwind (`max-h-[…] overflow-y-auto`) bastam. Exemplos já
+  implementados: participantes/relacionamentos gerados/envios na tela de detalhe do
+  Ciclo (`CicloDetalhePage`) e a lista de Palavras Mais Frequentes na tela de Nuvem de
+  Palavras (`ListaFrequenciaPalavras`).

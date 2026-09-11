@@ -221,8 +221,8 @@ export function EquipesListPage() {
       </div>
 
       <Paper>
-        <TableContainer>
-          <Table>
+        <TableContainer sx={{ maxHeight: 560, overflowY: 'auto' }}>
+          <Table stickyHeader>
             <TableHead>
               <TableRow>
                 <TableCell>Nome</TableCell>
