@@ -1,23 +1,33 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Alert, Button, IconButton, Paper, Skeleton, TextField, Tooltip, Typography } from '@mui/material'
+import { useCallback, useEffect, useState, type FormEvent, type MouseEvent } from 'react'
+import {
+  Alert,
+  Box,
+  Button,
+  IconButton,
+  Paper,
+  Skeleton,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  Typography,
+} from '@mui/material'
 import { useSearchParams } from 'react-router-dom'
+import FullscreenIcon from '@mui/icons-material/Fullscreen'
+import FullscreenExitIcon from '@mui/icons-material/FullscreenExit'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import { ListaFrequenciaPalavras } from '../../components/analise/ListaFrequenciaPalavras/ListaFrequenciaPalavras'
 import { MetricaCard } from '../../components/analise/MetricaCard/MetricaCard'
+import { NuvemBolhas } from '../../components/analise/NuvemBolhas/NuvemBolhas'
 import { SeletorCiclo } from '../../components/analise/SeletorCiclo/SeletorCiclo'
+import { useFullscreen } from '../../hooks/useFullscreen'
 import { ApiError } from '../../lib/apiClient'
 import { buscarNuvemPalavrasAnalise } from '../../services/analiseService'
 import type { NuvemPalavrasAnalise } from '../../types/analise'
 import { formatarInteiro, formatarTempoMedio, hojeYMD, inicioAnoCorrenteYMD } from './formatadores'
 
-/**
- * Frequência de palavras extraídas de respostas de texto aberto, já
- * tokenizadas/filtradas/agregadas e anonimizadas pelo backend (pares/
- * subordinado/clima só contribuem se atingirem o mínimo do ciclo — sem
- * bypass para nenhum papel). Esta página só formata/exibe `palavras` (já
- * ordenada por frequência decrescente, top 50) e `metricas` — nenhum
- * cálculo de tokenização/contagem/gate acontece aqui.
- */
+type Visualizacao = 'lista' | 'bolhas'
+
 export function AnaliseNuvemPalavrasPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -30,6 +40,9 @@ export function AnaliseNuvemPalavrasPage() {
   const [dados, setDados] = useState<NuvemPalavrasAnalise | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
+
+  const [visualizacao, setVisualizacao] = useState<Visualizacao>('lista')
+  const { containerRef, isFullscreen, isSupported, entrar, sair } = useFullscreen<HTMLDivElement>()
 
   const periodoInvalido = ate < de
   const filtroAlterado = cicloId !== null || de !== deInicial || ate !== ateInicial
@@ -85,6 +98,15 @@ export function AnaliseNuvemPalavrasPage() {
     setCicloId(null)
     setSearchParams({}, { replace: true })
     executarBusca({ de: deInicial, ate: ateInicial, cicloId: null })
+  }
+
+  function handleVisualizacaoChange(_event: MouseEvent<HTMLElement>, novaVisualizacao: Visualizacao | null) {
+    if (novaVisualizacao) setVisualizacao(novaVisualizacao)
+  }
+
+  function handleEntrarModoTV() {
+    setVisualizacao('bolhas')
+    void entrar()
   }
 
   return (
@@ -161,7 +183,44 @@ export function AnaliseNuvemPalavrasPage() {
       )}
 
       {!carregando && !erro && dados && (
-        <div className="flex flex-col gap-6">
+        <Box
+          ref={containerRef}
+          className="flex flex-col gap-6"
+          sx={
+            isFullscreen
+              ? { bgcolor: 'background.default', p: 4, height: '100vh', overflowY: 'auto' }
+              : undefined
+          }
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={visualizacao}
+              onChange={handleVisualizacaoChange}
+              aria-label="Alternar visualização das palavras"
+            >
+              <ToggleButton value="lista">Lista</ToggleButton>
+              <ToggleButton value="bolhas">Bolhas</ToggleButton>
+            </ToggleButtonGroup>
+            {isFullscreen ? (
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={<FullscreenExitIcon />}
+                onClick={() => void sair()}
+              >
+                Sair do Modo TV
+              </Button>
+            ) : (
+              isSupported && (
+                <Button variant="outlined" startIcon={<FullscreenIcon />} onClick={handleEntrarModoTV}>
+                  Modo TV
+                </Button>
+              )
+            )}
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <MetricaCard
               titulo="Envios e respostas"
@@ -169,26 +228,32 @@ export function AnaliseNuvemPalavrasPage() {
               descricao="envios no período"
               detalhes={[{ rotulo: 'Total de respostas', valor: formatarInteiro(dados.metricas.totalRespostas) }]}
               tooltip="Quantidade de envios de pesquisa no período selecionado, e quantas respostas já foram registradas."
+              tamanho={isFullscreen ? 'grande' : 'padrao'}
             />
             <MetricaCard
               titulo="Tempo médio de resposta"
               valor={formatarTempoMedio(dados.metricas.tempoMedioResposta.horas)}
               descricao={`${formatarInteiro(dados.metricas.tempoMedioResposta.amostras)} respostas com tempo registrado`}
               tooltip="Tempo médio que as pessoas levam para responder à pesquisa assim que recebem o link, no período selecionado."
+              tamanho={isFullscreen ? 'grande' : 'padrao'}
             />
           </div>
 
           <div className="flex flex-col gap-3">
-            <Typography variant="subtitle1">Palavras mais frequentes</Typography>
+            <Typography variant={isFullscreen ? 'h5' : 'subtitle1'}>Palavras mais frequentes</Typography>
             {dados.palavras.length === 0 ? (
               <Alert severity="info">Nenhuma palavra encontrada para o período/filtro selecionado.</Alert>
-            ) : (
+            ) : visualizacao === 'lista' ? (
               <Paper className="p-2">
                 <ListaFrequenciaPalavras palavras={dados.palavras} />
               </Paper>
+            ) : (
+              <Paper className="p-2">
+                <NuvemBolhas palavras={dados.palavras} altura={isFullscreen ? '70vh' : 560} />
+              </Paper>
             )}
           </div>
-        </div>
+        </Box>
       )}
     </div>
   )

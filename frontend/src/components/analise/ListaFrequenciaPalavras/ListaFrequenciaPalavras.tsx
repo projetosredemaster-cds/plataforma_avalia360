@@ -5,15 +5,7 @@ interface ListaFrequenciaPalavrasProps {
   palavras: PalavraFrequencia[]
 }
 
-/**
- * Componente "burro": `palavras` já vem ordenada por `frequencia`
- * decrescente (top 50) da API — este componente só renderiza na ordem
- * recebida, nunca reordena/filtra/agrupa. A barra de destaque é só
- * apresentação: largura proporcional ao maior valor de `frequencia` da
- * própria lista recebida (`Math.max`) — nenhum outro cálculo numérico
- * acontece aqui. Nenhuma prop carrega origem (avaliado/ciclo/tipo de
- * relacionamento) porque o payload, por design, não tem esse campo.
- */
+
 export function ListaFrequenciaPalavras({ palavras }: ListaFrequenciaPalavrasProps) {
   const frequenciaMaxima = palavras.length > 0 ? Math.max(...palavras.map((item) => item.frequencia)) : 0
 

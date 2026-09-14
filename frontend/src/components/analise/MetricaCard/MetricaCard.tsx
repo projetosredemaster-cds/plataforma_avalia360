@@ -12,14 +12,18 @@ interface MetricaCardProps {
   descricao?: string
   detalhes?: MetricaCardDetalhe[]
   tooltip?: string
+  /** `'grande'` amplia a tipografia para leitura a distância (ex. Modo TV). Default `'padrao'`. */
+  tamanho?: 'padrao' | 'grande'
 }
 
-export function MetricaCard({ titulo, valor, descricao, detalhes, tooltip }: MetricaCardProps) {
+export function MetricaCard({ titulo, valor, descricao, detalhes, tooltip, tamanho = 'padrao' }: MetricaCardProps) {
+  const grande = tamanho === 'grande'
+
   return (
     <Card className="flex h-full flex-col">
       <CardContent className="flex flex-1 flex-col gap-1">
         <div className="flex items-center gap-0.5">
-          <Typography variant="subtitle2" color="text.secondary">
+          <Typography variant={grande ? 'h6' : 'subtitle2'} color="text.secondary">
             {titulo}
           </Typography>
           {tooltip && (
@@ -30,11 +34,11 @@ export function MetricaCard({ titulo, valor, descricao, detalhes, tooltip }: Met
             </Tooltip>
           )}
         </div>
-        <Typography variant="h4" component="p" sx={{ fontWeight: 600 }}>
+        <Typography variant={grande ? 'h2' : 'h4'} component="p" sx={{ fontWeight: 600 }}>
           {valor}
         </Typography>
         {descricao && (
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant={grande ? 'body1' : 'body2'} color="text.secondary">
             {descricao}
           </Typography>
         )}
