@@ -18,6 +18,7 @@ import { AnaliseVisaoGeralPage } from './pages/AnaliseVisaoGeralPage/AnaliseVisa
 import { AnaliseAvaliacoesPage } from './pages/AnaliseAvaliacoesPage/AnaliseAvaliacoesPage'
 import { AnaliseRankingPage } from './pages/AnaliseRankingPage/AnaliseRankingPage'
 import { AnaliseNuvemPalavrasPage } from './pages/AnaliseNuvemPalavrasPage/AnaliseNuvemPalavrasPage'
+import { AnaliseResultadosPerguntaPage } from './pages/AnaliseResultadosPerguntaPage/AnaliseResultadosPerguntaPage'
 
 function App() {
   return (
@@ -48,6 +49,7 @@ function App() {
           <Route path="/analise/avaliacoes" element={<AnaliseAvaliacoesPage />} />
           <Route path="/analise/ranking" element={<AnaliseRankingPage />} />
           <Route path="/analise/nuvem-palavras" element={<AnaliseNuvemPalavrasPage />} />
+          <Route path="/analise/resultados-pergunta" element={<AnaliseResultadosPerguntaPage />} />
         </Route>
       </Route>
 

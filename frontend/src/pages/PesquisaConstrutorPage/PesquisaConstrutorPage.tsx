@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Card, CardContent, CircularProgress, MenuItem, Snackbar, TextField, Typography } from '@mui/material'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog'
 import { StatusPesquisaChip } from '../../components/pesquisas/StatusPesquisaChip/StatusPesquisaChip'
 import { TipoPesquisaChip } from '../../components/pesquisas/TipoPesquisaChip/TipoPesquisaChip'
 import { ApiError } from '../../lib/apiClient'
@@ -49,6 +50,10 @@ export function PesquisaConstrutorPage() {
 
   const [publicando, setPublicando] = useState(false)
   const [erroPublicar, setErroPublicar] = useState<string | null>(null)
+
+  const [confirmarEncerrar, setConfirmarEncerrar] = useState(false)
+  const [encerrando, setEncerrando] = useState(false)
+  const [erroEncerrar, setErroEncerrar] = useState<string | null>(null)
 
   const [snackbar, setSnackbar] = useState<string | null>(null)
 
@@ -205,6 +210,22 @@ export function PesquisaConstrutorPage() {
     }
   }
 
+  async function handleConfirmarEncerrar() {
+    if (!pesquisa) return
+    setEncerrando(true)
+    setErroEncerrar(null)
+    try {
+      const atualizada = await atualizarStatusPesquisa(pesquisa.id, 'encerrada')
+      setPesquisa((prev) => (prev ? { ...prev, status: atualizada.status } : prev))
+      setConfirmarEncerrar(false)
+      setSnackbar('Pesquisa encerrada com sucesso.')
+    } catch (err) {
+      setErroEncerrar(err instanceof ApiError ? err.message : 'Não foi possível encerrar a pesquisa.')
+    } finally {
+      setEncerrando(false)
+    }
+  }
+
   // ---------- Modo criação ----------
   if (!isEdicao) {
     return (
@@ -309,6 +330,18 @@ export function PesquisaConstrutorPage() {
             )}
           </div>
         )}
+        {pesquisa.status === 'publicada' && (
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={() => {
+              setErroEncerrar(null)
+              setConfirmarEncerrar(true)
+            }}
+          >
+            Encerrar
+          </Button>
+        )}
       </div>
 
       {somenteLeitura && (
@@ -406,6 +439,21 @@ export function PesquisaConstrutorPage() {
           </Alert>
         </Snackbar>
       )}
+
+      <ConfirmDialog
+        open={confirmarEncerrar}
+        titulo="Encerrar pesquisa"
+        mensagem="Encerrar pesquisa? Não será mais possível coletar ou editar respostas."
+        confirmarLabel="Encerrar"
+        carregando={encerrando}
+        erro={erroEncerrar}
+        onConfirmar={handleConfirmarEncerrar}
+        onCancelar={() => {
+          if (encerrando) return
+          setConfirmarEncerrar(false)
+          setErroEncerrar(null)
+        }}
+      />
     </div>
   )
 }

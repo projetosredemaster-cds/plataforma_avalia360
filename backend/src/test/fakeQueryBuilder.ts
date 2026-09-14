@@ -1,15 +1,18 @@
 /**
  * `QueryBuilder` falso, em memória, usado só por `FakeRepository.createQueryBuilder`
- * (ver `fakeRepository.ts`) para permitir testar `analise.service.ts` e
- * `analise-avaliacoes.service.ts` (os módulos hoje cujas queries de agregação
- * usam `createQueryBuilder`/SQL cru em vez de `find`/`count` simples — ver
- * `.claude/tasks/analise-visao-geral/` e `.claude/tasks/analise-avaliacoes/`).
+ * (ver `fakeRepository.ts`) para permitir testar `analise.service.ts`,
+ * `analise-avaliacoes.service.ts` e `analise-resultados-pergunta.service.ts`
+ * (os módulos hoje cujas queries de agregação usam `createQueryBuilder`/SQL
+ * cru em vez de `find`/`count` simples — ver `.claude/tasks/analise-visao-geral/`,
+ * `.claude/tasks/analise-avaliacoes/` e `.claude/tasks/analise-resultados-pergunta/`).
  *
  * NÃO é um interpretador SQL genérico — interpreta só o subconjunto de
- * sintaxe efetivamente usado nesses dois services:
+ * sintaxe efetivamente usado nesses services:
  * - `.select(expr, alias)` / `.addSelect(expr, alias)`: coluna simples
- *   (`'c.id'`), extração jsonb (`"item.valor ->> 'texto'"`), ou agregação
- *   (`'COUNT(*)'`, `'COUNT(rc.id)'`, `'COUNT(DISTINCT rel.avaliador_id)'`,
+ *   (`'c.id'`), extração jsonb (`"item.valor ->> 'texto'"`), extração jsonb
+ *   com cast entre parênteses (`"(item.valor ->> 'nota')::int"`, usada por
+ *   `agregarLikert360`/`agregarLikertClima` de "Resultados por Pergunta"), ou
+ *   agregação (`'COUNT(*)'`, `'COUNT(rc.id)'`, `'COUNT(DISTINCT rel.avaliador_id)'`,
  *   `'AVG(EXTRACT(EPOCH FROM (a - b)) / 3600)'`).
  * - `.where(cond, params)` / `.andWhere(cond, params)` (sempre combinadas por
  *   AND, como o SQL gerado real): suporta expressões compostas com `AND`/`OR`
@@ -66,8 +69,25 @@ function resolverCampo(refCampo: string, linha: Linha): unknown {
   return linhaAlias[snakeParaCamel(coluna)]
 }
 
-/** Resolve `alias.coluna` normal OU `alias.coluna ->> 'chave'` (extração de campo jsonb, shape `{ chave: valor }`). */
+/** Extrai `(alias.coluna ->> 'chave')::tipo` (jsonb + cast entre parênteses, ex.: `(item.valor ->> 'nota')::int`) — usado por "Resultados por Pergunta" para extrair nível numérico de likert/matriz. `undefined` = não casa com o padrão. */
+function extrairJsonComCast(ref: string): { campoBase: string; chave: string; cast: string } | undefined {
+  const m = ref.match(/^\(\s*(\w+\.\w+)\s*->>\s*'(\w+)'\s*\)::(\w+)$/)
+  if (!m) return undefined
+  const [, campoBase, chave, cast] = m as [string, string, string, string]
+  return { campoBase, chave, cast }
+}
+
+/** Resolve `alias.coluna` normal, `alias.coluna ->> 'chave'` OU `(alias.coluna ->> 'chave')::tipo` (extração de campo jsonb, shape `{ chave: valor }`, com cast opcional entre parênteses). */
 function resolverCampoOuJson(ref: string, linha: Linha): unknown {
+  const comCast = extrairJsonComCast(ref)
+  if (comCast) {
+    const bruto = resolverCampo(comCast.campoBase, linha)
+    if (bruto === null || bruto === undefined) return null
+    const valor = (bruto as Record<string, unknown>)[comCast.chave] ?? null
+    if (valor === null) return null
+    return comCast.cast === 'int' ? Number(valor) : String(valor)
+  }
+
   const jsonMatch = ref.match(/^(\w+\.\w+)\s*->>\s*'(\w+)'$/)
   if (jsonMatch) {
     const [, campoBase, chave] = jsonMatch as [string, string, string]
@@ -211,6 +231,14 @@ function avaliarExpressao(expr: string, params: Params, linha: Linha): boolean {
 }
 
 function resolverValorSelect(expr: string, linha: Linha): unknown {
+  const comCast = extrairJsonComCast(expr)
+  if (comCast) {
+    const bruto = resolverCampo(comCast.campoBase, linha)
+    if (bruto === null || bruto === undefined) return null
+    const valor = (bruto as Record<string, unknown>)[comCast.chave] ?? null
+    if (valor === null) return null
+    return comCast.cast === 'int' ? Number(valor) : String(valor)
+  }
   const jsonMatch = expr.match(/^(\w+\.\w+)\s*->>\s*'(\w+)'$/)
   if (jsonMatch) {
     const [, campoBase, chave] = jsonMatch as [string, string, string]

@@ -50,22 +50,43 @@ Plataforma de Avaliação 360° — uma plataforma single-tenant de avaliação 
   `analise-ranking.service.ts` — teve o passo `backend-developer` concluído mas ainda não
   passou por `backend-codereviewer`/`test-engineer`, confira
   `.claude/tasks/analise-ranking/task-backend.md` antes de tratar como fechado) e
-  `GET /api/analise/nuvem-palavras` (a mais recente das quatro, já com
-  `backend-codereviewer`/`test-engineer` concluídos — frequência agregada de palavras dos
-  mesmos textos `texto_aberto` já usados em "Avaliações", nunca o texto original exibido;
-  mesmo gate de liberação aplicado antes de buscar o texto no banco — nunca
-  buscar-depois-filtrar; stopwords em português + lowercase + piso de 3+ caracteres, top 50
-  por frequência decrescente, contagem unificada por ciclo/período sem segmentar por
-  pergunta; só visualização em LISTA nesta rodada — Bolhas e modo TV Dash ficam para
-  rodadas futuras, mas o contrato de resposta já foi desenhado para reaproveitamento por
-  elas sem mudar de shape; `analise-nuvem-palavras.service.ts`). Lógica compartilhada pelas
-  quatro telas (universo de ciclos por período, classificação avaliação_360/clima_geral, o
-  gate de pares/subordinado, e também as contagens/cálculo de tempo médio e
+  `GET /api/analise/nuvem-palavras` (já com `backend-codereviewer`/`test-engineer`
+  concluídos — frequência agregada de palavras dos mesmos textos `texto_aberto` já usados
+  em "Avaliações", nunca o texto original exibido; mesmo gate de liberação aplicado antes
+  de buscar o texto no banco — nunca buscar-depois-filtrar; stopwords em português +
+  lowercase + piso de 3+ caracteres, top 50 por frequência decrescente, contagem
+  unificada por ciclo/período sem segmentar por pergunta; só visualização em LISTA nesta
+  rodada — Bolhas e modo TV Dash ficam para rodadas futuras, mas o contrato de resposta
+  já foi desenhado para reaproveitamento por elas sem mudar de shape;
+  `analise-nuvem-palavras.service.ts`) e `GET /api/analise/resultados-pergunta` (quinta
+  tela, "Resultados por Pergunta" — pipeline completo já concluído: `spec`,
+  `planejamento-backend`/`planejamento-frontend`, `backend-developer`/`frontend-developer`,
+  `backend-codereviewer`/`frontend-codereviewer` sem achados críticos e `test-engineer`
+  com 29 testes novos, ver `.claude/tasks/analise-resultados-pergunta/`. DISTRIBUIÇÃO
+  (contagem por nível/opção), não média — diferente de "Ranking". Cobre só `likert`,
+  `matriz` e `caixa_selecao` (`texto_aberto` já é "Avaliações"/"Nuvem de Palavras",
+  `pessoa` reservado para uma futura tela "Análise de Menções"). Filtros de período +
+  `cicloId` opcional, como "Visão Geral"/"Avaliações"/"Nuvem de Palavras" — não o
+  `cicloId` único obrigatório de "Ranking". Para `avaliacao_360`, distribuição SEPARADA
+  por `tipo_relacionamento`; o gate de `pares`/`subordinado` é aplicado **por avaliado +
+  ciclo + tipo**, em duas fases (agregação bruta por avaliado → composição em memória que
+  só soma ao total da pergunta as fatias de avaliados que atingiram o mínimo — mesmo
+  padrão de `comporMediasPorAvaliado` do Ranking, adaptado de soma/qtd para contador por
+  nível/opção), nunca um mínimo único para a pergunta inteira. Para `matriz`, cada
+  competência mantém distribuição própria (nunca agregada entre competências, ao
+  contrário do Ranking). Para `clima_geral`, gate por ciclo inteiro, gate-primeiro-depois-
+  busca. Esta é a tela MAIS ESTRITA do módulo: o payload nunca expõe
+  `totalRespondentes`/`minimoNecessario` (diferente de "Avaliações") — só
+  `liberado: boolean` + `motivo?: 'aguardando_minimo_respondentes'`;
+  `analise-resultados-pergunta.service.ts`). Lógica compartilhada pelas cinco telas
+  (universo de ciclos por período, classificação avaliação_360/clima_geral, o gate de
+  pares/subordinado, e também as contagens/cálculo de tempo médio e
   `calcularMetricasComplementares` reaproveitados por Visão Geral e Nuvem de Palavras) vive
   em `analise-comum.ts`. Espelhado no frontend por `AnaliseVisaoGeralPage`,
-  `AnaliseAvaliacoesPage`, `AnaliseRankingPage` e `AnaliseNuvemPalavrasPage` — todas sem
-  atalho no card do Ciclo, acessíveis só pelo menu lateral (Análises → Quantitativa para
-  Visão Geral/Ranking, Análises → Qualitativa para Avaliações/Nuvem de Palavras).
+  `AnaliseAvaliacoesPage`, `AnaliseRankingPage`, `AnaliseNuvemPalavrasPage` e
+  `AnaliseResultadosPerguntaPage` — todas sem atalho no card do Ciclo, acessíveis só pelo
+  menu lateral (Análises → Quantitativa para Visão Geral/Ranking/Resultados por Pergunta,
+  Análises → Qualitativa para Avaliações/Nuvem de Palavras).
 
 Os agentes/skills do próprio repositório (`.claude/agents/*.md`, `.claude/skills/**/*.md`)
 se referem a estes diretórios como `apps/web` e `apps/api` — essa nomenclatura não existe
@@ -185,8 +206,9 @@ vazio/parcial.
 checar o papel do usuário autenticado (JWT do Supabase Auth); toda tela/ação do frontend
 deve se adaptar ou se esconder conforme o papel.
 
-**Tipos de pergunta:** exatamente 4 — `likert`, `texto_aberto`, `matriz`, `pessoa`.
-Outros tipos (CSAT, NPS, KPI, CES, NVS, Imagem, Indicação) foram deliberadamente
+**Tipos de pergunta:** 5 — `likert`, `texto_aberto`, `matriz`, `pessoa` e `caixa_selecao`
+(este último adicionado depois dos 4 originais do MVP; ver `common/enums.ts` nos dois
+lados). Outros tipos (CSAT, NPS, KPI, CES, NVS, Imagem, Indicação) foram deliberadamente
 removidos do escopo do MVP; não reintroduza nenhum sem confirmação explícita já
 registrada em uma spec.
 

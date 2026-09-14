@@ -1,5 +1,11 @@
 import { apiFetch } from '../lib/apiClient'
-import type { AvaliacoesAnalise, NuvemPalavrasAnalise, RankingAnalise, VisaoGeralAnalise } from '../types/analise'
+import type {
+  AvaliacoesAnalise,
+  NuvemPalavrasAnalise,
+  RankingAnalise,
+  ResultadosPerguntaAnalise,
+  VisaoGeralAnalise,
+} from '../types/analise'
 
 export interface BuscarVisaoGeralAnaliseParams {
   de: string // 'YYYY-MM-DD'
@@ -81,4 +87,25 @@ export function buscarNuvemPalavrasAnalise(
   const query = new URLSearchParams({ de: params.de, ate: params.ate })
   if (params.cicloId) query.set('cicloId', params.cicloId)
   return apiFetch<NuvemPalavrasAnalise>(`/api/analise/nuvem-palavras?${query.toString()}`)
+}
+
+export interface BuscarResultadosPerguntaAnaliseParams {
+  de: string // 'YYYY-MM-DD'
+  ate: string // 'YYYY-MM-DD'
+  cicloId?: string
+}
+
+/**
+ * `GET /api/analise/resultados-pergunta` — distribuição de contagens por
+ * nível (likert/matriz) ou opção (caixa_selecao), por pergunta. Tela MAIS
+ * ESTRITA do módulo: nunca expõe totalRespondentes/minimoNecessario, só
+ * `liberado`/`motivo`. `distribuicao`/`competencias` já vem zero-preenchida
+ * e ordenada pelo backend — esta função só transporta, não reordena/completa.
+ */
+export function buscarResultadosPerguntaAnalise(
+  params: BuscarResultadosPerguntaAnaliseParams,
+): Promise<ResultadosPerguntaAnalise> {
+  const query = new URLSearchParams({ de: params.de, ate: params.ate })
+  if (params.cicloId) query.set('cicloId', params.cicloId)
+  return apiFetch<ResultadosPerguntaAnalise>(`/api/analise/resultados-pergunta?${query.toString()}`)
 }

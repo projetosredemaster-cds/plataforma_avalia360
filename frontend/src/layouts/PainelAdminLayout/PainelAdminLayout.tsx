@@ -32,6 +32,7 @@ import BarChartIcon from '@mui/icons-material/BarChart'
 import ForumIcon from '@mui/icons-material/Forum'
 import LeaderboardIcon from '@mui/icons-material/Leaderboard'
 import CloudIcon from '@mui/icons-material/Cloud'
+import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
@@ -73,6 +74,11 @@ const GRUPOS: MenuGroup[] = [
         opcoes: [
           { label: 'Visão Geral', to: '/analise/visao-geral', icon: <BarChartIcon fontSize="small" /> },
           { label: 'Ranking', to: '/analise/ranking', icon: <LeaderboardIcon fontSize="small" /> },
+          {
+            label: 'Resultados por Pergunta',
+            to: '/analise/resultados-pergunta',
+            icon: <TableChartOutlinedIcon fontSize="small" />,
+          },
         ],
       },
       {

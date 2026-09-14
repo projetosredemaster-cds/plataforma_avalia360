@@ -186,3 +186,120 @@ export interface NuvemPalavrasAnalise {
   metricas: MetricasComplementaresNuvem
   motivoVazio: 'bloqueado_minimo_respondentes' | 'sem_dado' | null
 }
+
+// ---- "Resultados por Pergunta" (GET /api/analise/resultados-pergunta) ----
+// Tela MAIS ESTRITA do módulo até aqui: nunca expõe totalRespondentes/
+// minimoNecessario (diferente de AvaliacoesAnalise) — só liberado/motivo.
+// `distribuicao`/`competencias` só existem quando liberado === true.
+// `distribuicao` já vem zero-preenchida (todos os níveis 1..niveis / todas
+// as opcoesDisponiveis, mesmo com contagem 0) e ORDENADA pelo backend —
+// nunca reordenar/completar/filtrar no frontend. `porTipoRelacionamento`
+// também já vem em ordem fixa (autoavaliacao, gestor, pares, subordinado,
+// externo) — não reordenar.
+
+export interface ContagemNivel {
+  nivel: number
+  contagem: number
+}
+
+export interface ContagemOpcao {
+  opcao: string
+  contagem: number
+}
+
+export type TipoRelacionamentoTodos = TipoRelacionamentoIdentificado | TipoRelacionamentoAnonimizado
+
+export type TipoPerguntaEstruturada = 'likert' | 'matriz' | 'caixa_selecao'
+
+export interface DistribuicaoTipoRelacionamento {
+  tipoRelacionamento: TipoRelacionamentoTodos
+  liberado: boolean
+  motivo?: 'aguardando_minimo_respondentes'
+  distribuicao?: ContagemNivel[] // ausente quando liberado === false
+}
+
+export interface DistribuicaoOpcaoTipoRelacionamento {
+  tipoRelacionamento: TipoRelacionamentoTodos
+  liberado: boolean
+  motivo?: 'aguardando_minimo_respondentes'
+  distribuicao?: ContagemOpcao[] // ausente quando liberado === false
+}
+
+export interface CompetenciaDistribuicao {
+  competenciaId: string
+  competenciaNome: string
+  porTipoRelacionamento: DistribuicaoTipoRelacionamento[]
+}
+
+interface ResultadoPerguntaBase360 {
+  perguntaId: string
+  perguntaEnunciado: string
+  cicloId: string
+  nomeCiclo: string
+}
+
+export interface ResultadoPerguntaLikert360 extends ResultadoPerguntaBase360 {
+  tipo: 'likert'
+  niveis: number
+  rotulos: string[] // rotulos[i] é o rótulo do nível i+1
+  porTipoRelacionamento: DistribuicaoTipoRelacionamento[]
+}
+
+export interface ResultadoPerguntaMatriz360 extends ResultadoPerguntaBase360 {
+  tipo: 'matriz'
+  niveis: number
+  rotulos: string[] // escala compartilhada por todas as competências da pergunta
+  competencias: CompetenciaDistribuicao[] // distribuição SEPARADA por competência
+}
+
+export interface ResultadoPerguntaCaixaSelecao360 extends ResultadoPerguntaBase360 {
+  tipo: 'caixa_selecao'
+  opcoesDisponiveis: string[]
+  porTipoRelacionamento: DistribuicaoOpcaoTipoRelacionamento[]
+}
+
+export type ResultadoPergunta360 =
+  | ResultadoPerguntaLikert360
+  | ResultadoPerguntaMatriz360
+  | ResultadoPerguntaCaixaSelecao360
+
+interface ResultadoPerguntaBaseClima {
+  perguntaId: string
+  perguntaEnunciado: string
+  cicloId: string
+  nomeCiclo: string
+  liberado: boolean
+  motivo?: 'aguardando_minimo_respondentes'
+}
+
+export interface ResultadoPerguntaLikertClima extends ResultadoPerguntaBaseClima {
+  tipo: 'likert'
+  niveis: number
+  rotulos: string[]
+  distribuicao?: ContagemNivel[]
+}
+
+export interface ResultadoPerguntaMatrizClima extends ResultadoPerguntaBaseClima {
+  tipo: 'matriz'
+  niveis: number
+  rotulos: string[]
+  competencias?: Array<{ competenciaId: string; competenciaNome: string; distribuicao: ContagemNivel[] }>
+}
+
+export interface ResultadoPerguntaCaixaSelecaoClima extends ResultadoPerguntaBaseClima {
+  tipo: 'caixa_selecao'
+  opcoesDisponiveis: string[]
+  distribuicao?: ContagemOpcao[]
+}
+
+export type ResultadoPerguntaClima =
+  | ResultadoPerguntaLikertClima
+  | ResultadoPerguntaMatrizClima
+  | ResultadoPerguntaCaixaSelecaoClima
+
+export interface ResultadosPerguntaAnalise {
+  periodo: { de: string; ate: string }
+  cicloId: string | null
+  avaliacao360: ResultadoPergunta360[]
+  climaGeral: ResultadoPerguntaClima[]
+}

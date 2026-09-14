@@ -53,6 +53,10 @@ export function CiclosListPage() {
   const [ativando, setAtivando] = useState(false)
   const [erroAtivar, setErroAtivar] = useState<string | null>(null)
 
+  const [alvoEncerrar, setAlvoEncerrar] = useState<Ciclo | null>(null)
+  const [encerrando, setEncerrando] = useState(false)
+  const [erroEncerrar, setErroEncerrar] = useState<string | null>(null)
+
   const [ciclosComNovaResposta, setCiclosComNovaResposta] = useState<Set<string>>(new Set())
 
   const processarProgressoConhecido = useCallback((dados: Ciclo[]) => {
@@ -134,6 +138,21 @@ export function CiclosListPage() {
       setErroAtivar(err instanceof ApiError ? err.message : 'Não foi possível ativar o ciclo.')
     } finally {
       setAtivando(false)
+    }
+  }
+
+  async function handleConfirmarEncerrar() {
+    if (!alvoEncerrar) return
+    setEncerrando(true)
+    setErroEncerrar(null)
+    try {
+      await atualizarStatusCiclo(alvoEncerrar.id, 'encerrado')
+      setAlvoEncerrar(null)
+      await carregarCiclos()
+    } catch (err) {
+      setErroEncerrar(err instanceof ApiError ? err.message : 'Não foi possível encerrar o ciclo.')
+    } finally {
+      setEncerrando(false)
     }
   }
 
@@ -297,6 +316,18 @@ export function CiclosListPage() {
                         </Button>
                       </>
                     )}
+                    {ciclo.status === 'ativo' && (
+                      <Button
+                        size="small"
+                        color="warning"
+                        onClick={() => {
+                          setErroEncerrar(null)
+                          setAlvoEncerrar(ciclo)
+                        }}
+                      >
+                        Encerrar
+                      </Button>
+                    )}
                   </CardActions>
                 </Card>
               ))}
@@ -332,6 +363,21 @@ export function CiclosListPage() {
           if (ativando) return
           setAlvoAtivar(null)
           setErroAtivar(null)
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(alvoEncerrar)}
+        titulo="Encerrar ciclo"
+        mensagem="Encerrar este ciclo? Esta ação não pode ser desfeita."
+        confirmarLabel="Encerrar"
+        carregando={encerrando}
+        erro={erroEncerrar}
+        onConfirmar={handleConfirmarEncerrar}
+        onCancelar={() => {
+          if (encerrando) return
+          setAlvoEncerrar(null)
+          setErroEncerrar(null)
         }}
       />
     </div>

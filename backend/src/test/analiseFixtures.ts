@@ -12,6 +12,8 @@ import { ItemResposta } from '../modules/respostas/item-resposta.entity'
 import { RespostaClima } from '../modules/respostas-clima/resposta-clima.entity'
 import { ItemRespostaClima } from '../modules/respostas-clima/item-resposta-clima.entity'
 import { Pergunta } from '../modules/perguntas/pergunta.entity'
+import { PaginaPesquisa } from '../modules/paginas-pesquisa/pagina-pesquisa.entity'
+import { Competencia } from '../modules/competencias/competencia.entity'
 import { FakeRepository } from './fakeRepository'
 
 /**
@@ -30,6 +32,14 @@ import { FakeRepository } from './fakeRepository'
  * repositório também é ligado como alvo de JOIN dos outros via
  * `resolverEntidade` (ver `FakeRepository.createQueryBuilder`). Chamar em
  * beforeEach para isolar o estado entre testes.
+ *
+ * `paginasPesquisaRepo`/`competenciasRepo` foram acrescentados para
+ * "Resultados por Pergunta" (`.claude/tasks/analise-resultados-pergunta/`) —
+ * `buscarPerguntasEstruturaisPorPesquisa` faz `innerJoin(PaginaPesquisa, ...)`
+ * (enumeração estrutural de perguntas de ciclos de clima bloqueados) e
+ * `buscarNomesCompetencias` lê `Competencia` (nomes de competência da
+ * matriz). Nenhum dos módulos anteriores do `analise/` tocava essas duas
+ * entidades.
  */
 export function construirRepositoriosAnaliseFalsos() {
   const ciclosRepo = new FakeRepository<CicloAvaliacao>()
@@ -41,6 +51,8 @@ export function construirRepositoriosAnaliseFalsos() {
   const respostasClimaRepo = new FakeRepository<RespostaClima>()
   const itensRespostaClimaRepo = new FakeRepository<ItemRespostaClima>()
   const perguntasRepo = new FakeRepository<Pergunta>()
+  const paginasPesquisaRepo = new FakeRepository<PaginaPesquisa>()
+  const competenciasRepo = new FakeRepository<Competencia>()
   const participantesRepo = new FakeRepository<CicloParticipante>()
   // colaboradoresRepo é tocado diretamente por "Avaliações"
   // (`buscarNomesColaboradores`/joins de `buscarIdentificadas360`) e também
@@ -59,6 +71,8 @@ export function construirRepositoriosAnaliseFalsos() {
     [RespostaClima, respostasClimaRepo],
     [ItemRespostaClima, itensRespostaClimaRepo],
     [Pergunta, perguntasRepo],
+    [PaginaPesquisa, paginasPesquisaRepo],
+    [Competencia, competenciasRepo],
     [CicloParticipante, participantesRepo],
     [Colaborador, colaboradoresRepo],
   ])
@@ -83,6 +97,8 @@ export function construirRepositoriosAnaliseFalsos() {
     respostasClimaRepo,
     itensRespostaClimaRepo,
     perguntasRepo,
+    paginasPesquisaRepo,
+    competenciasRepo,
     participantesRepo,
     colaboradoresRepo,
   }
@@ -228,4 +244,27 @@ export function criarItemRespostaClimaFixture(parcial: Partial<ItemRespostaClima
     criadoEm: new Date(),
     ...parcial,
   } as ItemRespostaClima
+}
+
+/** Fixture de `paginas_pesquisa` — usada por "Resultados por Pergunta" para vincular `perguntas.pagina_id -> pesquisa_id`. */
+export function criarPaginaPesquisaFixture(parcial: Partial<PaginaPesquisa> = {}): PaginaPesquisa {
+  return {
+    id: randomUUID(),
+    pesquisaId: randomUUID(),
+    titulo: null,
+    ordem: 1,
+    ...parcial,
+  } as PaginaPesquisa
+}
+
+/** Fixture de `competencias` — usada por "Resultados por Pergunta" para resolver `competenciaNome` na matriz. */
+export function criarCompetenciaFixture(parcial: Partial<Competencia> = {}): Competencia {
+  return {
+    id: randomUUID(),
+    nome: 'Comunicação',
+    descricao: null,
+    ativo: true,
+    criadoEm: new Date(),
+    ...parcial,
+  } as Competencia
 }
