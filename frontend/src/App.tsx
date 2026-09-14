@@ -9,6 +9,7 @@ import { ColaboradorFormPage } from './pages/ColaboradorFormPage/ColaboradorForm
 import { EquipesListPage } from './pages/EquipesListPage/EquipesListPage'
 import { PesquisasListPage } from './pages/PesquisasListPage/PesquisasListPage'
 import { PesquisaConstrutorPage } from './pages/PesquisaConstrutorPage/PesquisaConstrutorPage'
+import { PesquisaPreviewPage } from './pages/PesquisaPreviewPage/PesquisaPreviewPage'
 import { CiclosListPage } from './pages/CiclosListPage/CiclosListPage'
 import { CicloFormPage } from './pages/CicloFormPage/CicloFormPage'
 import { CicloDetalhePage } from './pages/CicloDetalhePage/CicloDetalhePage'
@@ -39,6 +40,7 @@ function App() {
           <Route path="/pesquisas" element={<PesquisasListPage />} />
           <Route path="/pesquisas/nova" element={<PesquisaConstrutorPage />} />
           <Route path="/pesquisas/:id/editar" element={<PesquisaConstrutorPage />} />
+          <Route path="/pesquisas/:id/preview" element={<PesquisaPreviewPage />} />
           <Route path="/ciclos" element={<CiclosListPage />} />
           <Route path="/ciclos/novo" element={<CicloFormPage />} />
           <Route path="/ciclos/:id" element={<CicloDetalhePage />} />

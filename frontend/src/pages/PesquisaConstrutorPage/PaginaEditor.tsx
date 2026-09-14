@@ -14,6 +14,7 @@ const TIPO_OPCOES_BASE: { valor: TipoPergunta; label: string }[] = [
   { valor: 'texto_aberto', label: 'Texto aberto' },
   { valor: 'matriz', label: 'Matriz' },
   { valor: 'pessoa', label: 'Pessoa' },
+  { valor: 'caixa_selecao', label: 'Caixa de seleção' },
 ]
 
 interface PaginaEditorProps {
@@ -144,7 +145,7 @@ export function PaginaEditor({
   }
 
   async function handleAdicionarPergunta() {
-    if (tipoNovaPergunta === 'matriz' || tipoNovaPergunta === 'pessoa') {
+    if (tipoNovaPergunta === 'matriz' || tipoNovaPergunta === 'pessoa' || tipoNovaPergunta === 'caixa_selecao') {
       setErroRascunho(null)
       setRascunhoAberto(true)
       return
@@ -230,7 +231,10 @@ export function PaginaEditor({
               onSalvar={(patch) => handleSalvarPergunta(pergunta.id, patch)}
             />
           ))}
-          {rascunhoAberto && (tipoNovaPergunta === 'matriz' || tipoNovaPergunta === 'pessoa') && (
+          {rascunhoAberto &&
+            (tipoNovaPergunta === 'matriz' ||
+              tipoNovaPergunta === 'pessoa' ||
+              tipoNovaPergunta === 'caixa_selecao') && (
             <PerguntaRascunhoCard
               tipo={tipoNovaPergunta}
               competencias={competencias}

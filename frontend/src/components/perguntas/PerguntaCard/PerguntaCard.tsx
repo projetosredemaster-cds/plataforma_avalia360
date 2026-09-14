@@ -7,19 +7,34 @@ import { PerguntaLikertEditor, type PerguntaLikertValor } from '../PerguntaLiker
 import { PerguntaTextoAbertoEditor, type PerguntaTextoAbertoValor } from '../PerguntaTextoAberto/PerguntaTextoAbertoEditor'
 import { PerguntaMatrizEditor, type PerguntaMatrizValor } from '../PerguntaMatriz/PerguntaMatrizEditor'
 import { PerguntaPessoaEditor, type PerguntaPessoaValor } from '../PerguntaPessoa/PerguntaPessoaEditor'
-import { validarConfiguracaoLikert, validarConfiguracaoPessoa, validarPerguntaMatriz } from '../validacaoPergunta'
+import {
+  PerguntaCaixaSelecaoEditor,
+  type PerguntaCaixaSelecaoValor,
+} from '../PerguntaCaixaSelecao/PerguntaCaixaSelecaoEditor'
+import {
+  validarConfiguracaoCaixaSelecao,
+  validarConfiguracaoLikert,
+  validarConfiguracaoPessoa,
+  validarPerguntaMatriz,
+} from '../validacaoPergunta'
 
 const TIPO_LABEL: Record<Pergunta['tipo'], string> = {
   likert: 'Likert',
   texto_aberto: 'Texto aberto',
   matriz: 'Matriz',
   pessoa: 'Pessoa',
+  caixa_selecao: 'Caixa de seleção',
 }
 
 /** Tempo de inatividade antes de persistir uma edição de campo automaticamente. */
 const DEBOUNCE_MS = 700
 
-type ValorEditavel = PerguntaLikertValor | PerguntaTextoAbertoValor | PerguntaMatrizValor | PerguntaPessoaValor
+type ValorEditavel =
+  | PerguntaLikertValor
+  | PerguntaTextoAbertoValor
+  | PerguntaMatrizValor
+  | PerguntaPessoaValor
+  | PerguntaCaixaSelecaoValor
 
 function paraValorEditavel(pergunta: Pergunta): ValorEditavel {
   if (pergunta.tipo === 'matriz') {
@@ -45,6 +60,9 @@ function valorValido(tipo: Pergunta['tipo'], valor: ValorEditavel): boolean {
     return validarPerguntaMatriz(matrizValor.configuracao, matrizValor.competenciaIds)
   }
   if (tipo === 'pessoa') return validarConfiguracaoPessoa((valor as PerguntaPessoaValor).configuracao)
+  if (tipo === 'caixa_selecao') {
+    return validarConfiguracaoCaixaSelecao((valor as PerguntaCaixaSelecaoValor).configuracao)
+  }
   return true
 }
 
@@ -103,7 +121,7 @@ export function PerguntaCard({
   async function commit(valorParaSalvar: ValorEditavel) {
     pendingValorRef.current = null
     if (!valorValido(pergunta.tipo, valorParaSalvar)) {
-      setErroSalvar('Preencha os campos obrigatórios (enunciado, níveis/rótulos, competências ou relacionamentos, conforme o tipo) antes de salvar.')
+      setErroSalvar('Preencha os campos obrigatórios (enunciado, níveis/rótulos, competências, relacionamentos ou opções, conforme o tipo) antes de salvar.')
       return
     }
     setSalvando(true)
@@ -226,6 +244,13 @@ export function PerguntaCard({
         {pergunta.tipo === 'pessoa' && (
           <PerguntaPessoaEditor
             valor={valorAtual as PerguntaPessoaValor}
+            onChange={agendarSalvamento}
+            somenteLeitura={somenteLeitura}
+          />
+        )}
+        {pergunta.tipo === 'caixa_selecao' && (
+          <PerguntaCaixaSelecaoEditor
+            valor={valorAtual as PerguntaCaixaSelecaoValor}
             onChange={agendarSalvamento}
             somenteLeitura={somenteLeitura}
           />

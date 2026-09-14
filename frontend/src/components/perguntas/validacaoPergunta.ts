@@ -1,4 +1,4 @@
-import type { ConfiguracaoLikert, ConfiguracaoPessoa } from '../../types/pesquisa'
+import type { ConfiguracaoCaixaSelecao, ConfiguracaoLikert, ConfiguracaoPessoa } from '../../types/pesquisa'
 
 /**
  * Funções puras de validação/ajuste compartilhadas pelos editores e
@@ -37,6 +37,14 @@ export function validarConfiguracaoPessoa(configuracao: ConfiguracaoPessoa): boo
   return configuracao.filtroRelacionamento.length > 0
 }
 
+/** Espelha a validação do backend: `opcoes` precisa ter pelo menos 1 string não vazia. */
+export function validarConfiguracaoCaixaSelecao(configuracao: ConfiguracaoCaixaSelecao): boolean {
+  return (
+    configuracao.opcoes.length > 0 &&
+    configuracao.opcoes.every((opcao) => opcao.trim().length > 0)
+  )
+}
+
 // --- Validação de resposta (usada pelo futuro formulário público de resposta, fora de escopo desta task) ---
 
 export function likertRespostaValida(obrigatoria: boolean, valor: { nota: number } | null): boolean {
@@ -59,4 +67,11 @@ export function matrizRespostaValida(
 
 export function pessoaRespostaValida(obrigatoria: boolean, valor: { colaboradorId: string } | null): boolean {
   return !obrigatoria || Boolean(valor?.colaboradorId)
+}
+
+export function caixaSelecaoRespostaValida(
+  obrigatoria: boolean,
+  valor: { opcoes: string[] } | null,
+): boolean {
+  return !obrigatoria || Boolean(valor && valor.opcoes.length > 0)
 }

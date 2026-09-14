@@ -17,6 +17,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
+import VisibilityIcon from '@mui/icons-material/Visibility'
 import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog'
 import { StatusPesquisaChip } from '../../components/pesquisas/StatusPesquisaChip/StatusPesquisaChip'
 import { ApiError } from '../../lib/apiClient'
@@ -279,6 +280,13 @@ export function PesquisasListPage() {
                   <CardActions className="flex flex-wrap justify-end gap-1">
                     <Button size="small" onClick={() => navigate(`/pesquisas/${pesquisa.id}/editar`)}>
                       {pesquisa.status === 'rascunho' ? 'Editar' : 'Ver detalhes'}
+                    </Button>
+                    <Button
+                      size="small"
+                      startIcon={<VisibilityIcon fontSize="small" />}
+                      onClick={() => navigate(`/pesquisas/${pesquisa.id}/preview`)}
+                    >
+                      Pré-visualizar
                     </Button>
                     <Button size="small" onClick={() => handleDuplicar(pesquisa)} disabled={duplicandoId === pesquisa.id}>
                       {duplicandoId === pesquisa.id ? 'Duplicando...' : 'Duplicar'}

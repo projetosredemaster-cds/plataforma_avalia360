@@ -21,4 +21,8 @@ export const CARGO_OPCOES = [
   'Gerente',
   'Diretor',
   'Gestor',
+  'Gerente geral',
+  'Subgerente',
+  'Vendedor de acessórios',
+  'Agendador',
 ] as const

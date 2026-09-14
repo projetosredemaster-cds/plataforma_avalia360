@@ -11,7 +11,7 @@ Eu não tenho acesso ao ambiente do usuário (VSCode, banco, terminal). O fluxo 
 Economia de token é prioridade constante: ajustes pontuais pulam planejamento/codereview ("ajuste pontual"); só uso o pipeline completo pra funcionalidades novas maiores; test-engineer fica reservado pra rodadas de final de dia, não por feature.
 Erro de código: peço o texto exato do erro (console/terminal) antes de mandar prompt.
 Erro de configuração (env, DNS, dependência): resolvo com passos manuais, sem gastar prompt de agente.
-Migrations nunca confiáveis via npm run migration:run (incompatibilidade TypeScript/ts-node não resolvida) — sempre peço ao agente pra exibir o SQL puro do up() (só leitura) e o usuário roda manualmente no SQL Editor do Supabase.
+Migrations nunca confiáveis via npm run migration:run (incompatibilidade TypeScript/ts-node não resolvida). REGRA ATUALIZADA: o agente NUNCA cria arquivo de migration (.ts) no repositório — nem isso. Só entrega o SQL puro em texto (chat/markdown), sem criar nenhum arquivo versionado no projeto. O usuário roda esse SQL manualmente no SQL Editor do Supabase e decide se/quando formalizar um arquivo de migration depois, se quiser.
 Decisão de arquitetura ambígua → pergunto com opções antes de mandar prompt.
 Nomenclatura do banco/domínio em português.
 Brief documentado em arquivos versionados (agora em v5) — atualizo quando há mudança grande de escopo.

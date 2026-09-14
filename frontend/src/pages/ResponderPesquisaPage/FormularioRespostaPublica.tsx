@@ -8,6 +8,11 @@ import {
   type RespostaTextoAberto,
 } from '../../components/perguntas/PerguntaTextoAberto/PerguntaTextoAbertoResposta'
 import {
+  PerguntaCaixaSelecaoResposta,
+  type RespostaCaixaSelecao,
+} from '../../components/perguntas/PerguntaCaixaSelecao/PerguntaCaixaSelecaoResposta'
+import {
+  caixaSelecaoRespostaValida,
   likertRespostaValida,
   matrizRespostaValida,
   pessoaRespostaValida,
@@ -80,6 +85,9 @@ export function FormularioRespostaPublica({
             break
           case 'pessoa':
             valida = pessoaRespostaValida(pergunta.obrigatoria, valor as RespostaPessoa | null)
+            break
+          case 'caixa_selecao':
+            valida = caixaSelecaoRespostaValida(pergunta.obrigatoria, valor as RespostaCaixaSelecao | null)
             break
           default:
             valida = true
@@ -197,6 +205,18 @@ export function FormularioRespostaPublica({
                         obrigatoria={pergunta.obrigatoria}
                         opcoes={pergunta.opcoesPessoa}
                         valor={(respostas[pergunta.id] as RespostaPessoa) ?? null}
+                        onChange={(valor) => setResposta(pergunta.id, valor)}
+                        erro={erro}
+                      />
+                    )
+                  case 'caixa_selecao':
+                    return (
+                      <PerguntaCaixaSelecaoResposta
+                        key={pergunta.id}
+                        enunciado={pergunta.enunciado}
+                        obrigatoria={pergunta.obrigatoria}
+                        configuracao={pergunta.configuracao}
+                        valor={(respostas[pergunta.id] as RespostaCaixaSelecao) ?? null}
                         onChange={(valor) => setResposta(pergunta.id, valor)}
                         erro={erro}
                       />

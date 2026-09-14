@@ -126,6 +126,22 @@ function validarConfiguracaoPergunta(
     return {}
   }
 
+  if (tipo === 'caixa_selecao') {
+    const { opcoes } = objeto
+    if (
+      !Array.isArray(opcoes) ||
+      opcoes.length === 0 ||
+      opcoes.some((opcao) => typeof opcao !== 'string' || opcao.trim().length === 0)
+    ) {
+      throw new ErroHttp(
+        422,
+        'CONFIGURACAO_INVALIDA',
+        'Campo "configuracao.opcoes" é obrigatório e deve ter pelo menos uma string não vazia.',
+      )
+    }
+    return { opcoes }
+  }
+
   // tipo === 'pessoa'
   const { filtroRelacionamento } = objeto
   if (

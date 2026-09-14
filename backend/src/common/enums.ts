@@ -20,15 +20,18 @@ export type StatusCiclo = 'rascunho' | 'ativo' | 'encerrado'
 
 export const STATUS_CICLO_VALORES: StatusCiclo[] = ['rascunho', 'ativo', 'encerrado']
 
-// Exatamente 4 tipos de pergunta no MVP — CSAT/NPS/KPI/CES/NVS/Imagem/
-// Indicação foram deliberadamente removidos do escopo, não reintroduzir.
-export type TipoPergunta = 'likert' | 'texto_aberto' | 'matriz' | 'pessoa'
+// 5 tipos de pergunta no MVP — CSAT/NPS/KPI/CES/NVS/Imagem/Indicação foram
+// deliberadamente removidos do escopo, não reintroduzir. `caixa_selecao` foi
+// adicionado depois dos 4 originais (enum Postgres alterado manualmente,
+// sem migration no repo — ver CLAUDE.md).
+export type TipoPergunta = 'likert' | 'texto_aberto' | 'matriz' | 'pessoa' | 'caixa_selecao'
 
 export const TIPO_PERGUNTA_VALORES: TipoPergunta[] = [
   'likert',
   'texto_aberto',
   'matriz',
   'pessoa',
+  'caixa_selecao',
 ]
 
 /**
@@ -157,6 +160,10 @@ export type CargoColaborador =
   | 'Gerente'
   | 'Diretor'
   | 'Gestor'
+  | 'Gerente geral'
+  | 'Subgerente'
+  | 'Vendedor de acessórios'
+  | 'Agendador'
 
 export const CARGO_COLABORADOR_VALORES: CargoColaborador[] = [
   'Auxiliar de Escritório',
@@ -175,4 +182,8 @@ export const CARGO_COLABORADOR_VALORES: CargoColaborador[] = [
   'Gerente',
   'Diretor',
   'Gestor',
+  'Gerente geral',
+  'Subgerente',
+  'Vendedor de acessórios',
+  'Agendador',
 ]

@@ -358,7 +358,13 @@ export async function resolverOpcoesPessoa(
 function valorValidoParaTipo(
   tipo: TipoPergunta,
   valor: unknown,
-  contexto: { niveis: number | undefined; competenciaIds: string[]; opcoesPessoaIds: Set<string> | undefined },
+  contexto: {
+    niveis: number | undefined
+    competenciaIds: string[]
+    opcoesPessoaIds: Set<string> | undefined
+    opcoesCaixaSelecao: Set<string> | undefined
+    obrigatoria: boolean
+  },
 ): boolean {
   if (typeof valor !== 'object' || valor === null || Array.isArray(valor)) return false
   const objeto = valor as Record<string, unknown>
@@ -383,9 +389,19 @@ function valorValidoParaTipo(
     })
   }
 
-  // tipo === 'pessoa'
-  const colaboradorId = objeto.colaboradorId
-  return typeof colaboradorId === 'string' && (contexto.opcoesPessoaIds?.has(colaboradorId) ?? false)
+  if (tipo === 'pessoa') {
+    const colaboradorId = objeto.colaboradorId
+    return typeof colaboradorId === 'string' && (contexto.opcoesPessoaIds?.has(colaboradorId) ?? false)
+  }
+
+  // tipo === 'caixa_selecao'
+  const opcoesSelecionadas = objeto.opcoes
+  if (!Array.isArray(opcoesSelecionadas)) return false
+  if (contexto.obrigatoria && opcoesSelecionadas.length === 0) return false
+  const opcoesValidas = contexto.opcoesCaixaSelecao ?? new Set<string>()
+  return opcoesSelecionadas.every(
+    (opcao) => typeof opcao === 'string' && opcoesValidas.has(opcao),
+  )
 }
 
 // --- Endpoint 1: GET /api/publico/envios/:token/status --------------------
@@ -645,10 +661,15 @@ export async function enviarRespostas(
     }
 
     const configuracao = pergunta.configuracao as Record<string, unknown>
+    const opcoesCaixaSelecao = Array.isArray(configuracao.opcoes)
+      ? new Set(configuracao.opcoes as string[])
+      : undefined
     const valido = valorValidoParaTipo(pergunta.tipo, valor, {
       niveis: typeof configuracao.niveis === 'number' ? configuracao.niveis : undefined,
       competenciaIds: competenciaIdsPorPergunta.get(pergunta.id) ?? [],
       opcoesPessoaIds: opcoesPessoaPorPergunta.get(pergunta.id),
+      opcoesCaixaSelecao,
+      obrigatoria: pergunta.obrigatoria,
     })
     if (!valido) {
       throw new ErroHttp(

@@ -3,8 +3,10 @@ import type { RespostaLikert } from '../components/perguntas/PerguntaLikert/Perg
 import type { RespostaMatriz } from '../components/perguntas/PerguntaMatriz/PerguntaMatrizResposta'
 import type { RespostaPessoa } from '../components/perguntas/PerguntaPessoa/PerguntaPessoaResposta'
 import type { RespostaTextoAberto } from '../components/perguntas/PerguntaTextoAberto/PerguntaTextoAbertoResposta'
+import type { RespostaCaixaSelecao } from '../components/perguntas/PerguntaCaixaSelecao/PerguntaCaixaSelecaoResposta'
 import type { Competencia } from './competencia'
 import type {
+  ConfiguracaoCaixaSelecao,
   ConfiguracaoLikert,
   ConfiguracaoPessoa,
   ConfiguracaoTextoAberto,
@@ -62,6 +64,10 @@ export type PerguntaFormularioPublico =
       configuracao: ConfiguracaoPessoa
       opcoesPessoa: ColaboradorOpcao[]
     })
+  | (PerguntaFormularioCamposComuns & {
+      tipo: 'caixa_selecao'
+      configuracao: ConfiguracaoCaixaSelecao
+    })
 
 export interface PaginaFormularioPublico {
   id: string
@@ -75,7 +81,12 @@ export interface FormularioPublicoResposta {
   paginas: PaginaFormularioPublico[]
 }
 
-export type ValorRespostaPublica = RespostaLikert | RespostaTextoAberto | RespostaMatriz | RespostaPessoa
+export type ValorRespostaPublica =
+  | RespostaLikert
+  | RespostaTextoAberto
+  | RespostaMatriz
+  | RespostaPessoa
+  | RespostaCaixaSelecao
 
 export interface ItemRespostaPayload {
   perguntaId: string

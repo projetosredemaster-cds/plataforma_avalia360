@@ -5,8 +5,8 @@ export type StatusPesquisa = 'rascunho' | 'publicada' | 'encerrada'
 /** Escolhido na criação da pesquisa (`POST /api/pesquisas`) e IMUTÁVEL depois — nunca aceito em `PUT /api/pesquisas/:id`. */
 export type TipoPesquisa = 'avaliacao_360' | 'clima_geral'
 
-/** Exatamente 4 tipos de pergunta no MVP — nenhum outro deve ser adicionado. */
-export type TipoPergunta = 'likert' | 'texto_aberto' | 'matriz' | 'pessoa'
+/** 5 tipos de pergunta no MVP — nenhum outro deve ser adicionado sem confirmação explícita. */
+export type TipoPergunta = 'likert' | 'texto_aberto' | 'matriz' | 'pessoa' | 'caixa_selecao'
 
 export interface ConfiguracaoLikert {
   niveis: number
@@ -19,7 +19,16 @@ export interface ConfiguracaoPessoa {
   filtroRelacionamento: string[]
 }
 
-export type ConfiguracaoPergunta = ConfiguracaoLikert | ConfiguracaoTextoAberto | ConfiguracaoPessoa
+/** Opções de texto definidas pelo admin — o colaborador pode marcar 0..N delas ao responder. */
+export interface ConfiguracaoCaixaSelecao {
+  opcoes: string[]
+}
+
+export type ConfiguracaoPergunta =
+  | ConfiguracaoLikert
+  | ConfiguracaoTextoAberto
+  | ConfiguracaoPessoa
+  | ConfiguracaoCaixaSelecao
 
 interface PerguntaCamposComuns {
   id: string
@@ -40,6 +49,7 @@ export type Pergunta =
   | (PerguntaCamposComuns & { tipo: 'texto_aberto'; configuracao: ConfiguracaoTextoAberto })
   | (PerguntaCamposComuns & { tipo: 'matriz'; configuracao: ConfiguracaoLikert })
   | (PerguntaCamposComuns & { tipo: 'pessoa'; configuracao: ConfiguracaoPessoa })
+  | (PerguntaCamposComuns & { tipo: 'caixa_selecao'; configuracao: ConfiguracaoCaixaSelecao })
 
 export interface Pagina {
   id: string
@@ -104,6 +114,12 @@ export type PerguntaPayload =
       competenciaIds: string[]
     }
   | { tipo: 'pessoa'; enunciado: string; obrigatoria: boolean; configuracao: ConfiguracaoPessoa }
+  | {
+      tipo: 'caixa_selecao'
+      enunciado: string
+      obrigatoria: boolean
+      configuracao: ConfiguracaoCaixaSelecao
+    }
 
 /** Corpo enviado a `PUT .../perguntas/:id` — `tipo` não é editável após criado. */
 export interface AtualizarPerguntaPayload {
