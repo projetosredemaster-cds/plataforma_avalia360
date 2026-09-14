@@ -6,13 +6,16 @@ import {
   Alert,
   Box,
   Button,
+  IconButton,
   Paper,
   Skeleton,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { useSearchParams } from 'react-router-dom'
+import { BotaoAtualizarAnalise } from '../../components/analise/BotaoAtualizarAnalise/BotaoAtualizarAnalise'
 import { ResultadoPergunta360Card } from '../../components/analise/ResultadoPergunta360Card/ResultadoPergunta360Card'
 import { ResultadoPerguntaClimaCard } from '../../components/analise/ResultadoPerguntaClimaCard/ResultadoPerguntaClimaCard'
 import { SeletorCiclo } from '../../components/analise/SeletorCiclo/SeletorCiclo'
@@ -21,6 +24,7 @@ import { buscarResultadosPerguntaAnalise } from '../../services/analiseService'
 import type { ResultadosPerguntaAnalise } from '../../types/analise'
 import { agruparPorCiclo } from './agrupamento'
 import { hojeYMD, inicioAnoCorrenteYMD } from './formatadores'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 
 export function AnaliseResultadosPerguntaPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -98,9 +102,16 @@ export function AnaliseResultadosPerguntaPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Typography variant="h5" component="h1">
-        Resultados por Pergunta
-      </Typography>
+      <div className="flex flex-wrap items-center justify-start gap-2">
+        <Typography variant="h5" component="h1">
+          Resultados por Pergunta
+        </Typography>
+        <Tooltip title="Distribuição das perguntas de likert, matriz e caixa de seleção por ciclo" arrow placement="top">
+          <IconButton size="medium" aria-label="Avaliações" sx={{ p: 0.25 }}>
+            <InfoOutlinedIcon fontSize="medium" color="action" />
+            </IconButton>
+          </Tooltip>
+      </div>
 
       <Paper component="form" onSubmit={handleSubmit} className="flex flex-wrap items-center gap-3 p-4">
         <TextField
@@ -140,6 +151,7 @@ export function AnaliseResultadosPerguntaPage() {
             Limpar filtro
           </Button>
         )}
+        <BotaoAtualizarAnalise atualizando={carregando} onClick={() => executarBusca()} />
       </Paper>
 
       {carregando && (

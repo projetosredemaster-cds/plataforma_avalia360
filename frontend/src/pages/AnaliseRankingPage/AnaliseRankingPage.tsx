@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useSearchParams } from 'react-router-dom'
+import { BotaoAtualizarAnalise } from '../../components/analise/BotaoAtualizarAnalise/BotaoAtualizarAnalise'
 import { RankingTabela } from '../../components/analise/RankingTabela/RankingTabela'
 import { SeletorCiclo } from '../../components/analise/SeletorCiclo/SeletorCiclo'
 import { CARGO_OPCOES } from '../../constants/colaborador'
@@ -223,6 +224,8 @@ export function AnaliseRankingPage() {
             </MenuItem>
           ))}
         </TextField>
+
+        <BotaoAtualizarAnalise atualizando={carregando} onClick={() => executarBusca()} />
       </Paper>
 
       {!cicloId && !carregando && (

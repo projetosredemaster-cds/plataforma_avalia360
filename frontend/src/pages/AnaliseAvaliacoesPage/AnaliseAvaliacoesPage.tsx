@@ -15,6 +15,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { useSearchParams } from 'react-router-dom'
 import { AvaliacaoIdentificadaCard } from '../../components/analise/AvaliacaoIdentificadaCard/AvaliacaoIdentificadaCard'
+import { BotaoAtualizarAnalise } from '../../components/analise/BotaoAtualizarAnalise/BotaoAtualizarAnalise'
 import { AvisoLimitacaoAnonimizacao } from '../../components/analise/AvisoLimitacaoAnonimizacao/AvisoLimitacaoAnonimizacao'
 import { GrupoClimaCard } from '../../components/analise/GrupoClimaCard/GrupoClimaCard'
 import { GrupoParesSubordinadoCard } from '../../components/analise/GrupoParesSubordinadoCard/GrupoParesSubordinadoCard'
@@ -156,6 +157,7 @@ export function AnaliseAvaliacoesPage() {
             Limpar filtro
           </Button>
         )}
+        <BotaoAtualizarAnalise atualizando={carregando} onClick={() => executarBusca()} />
       </Paper>
 
       {!carregando && !erro && existeGrupoLiberado && <AvisoLimitacaoAnonimizacao />}

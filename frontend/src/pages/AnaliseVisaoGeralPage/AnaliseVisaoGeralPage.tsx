@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Alert, Button, IconButton, Paper, Skeleton, TextField, Tooltip, Typography } from '@mui/material'
 import { useSearchParams } from 'react-router-dom'
+import { BotaoAtualizarAnalise } from '../../components/analise/BotaoAtualizarAnalise/BotaoAtualizarAnalise'
 import { MetricaCard } from '../../components/analise/MetricaCard/MetricaCard'
 import { SeletorCiclo } from '../../components/analise/SeletorCiclo/SeletorCiclo'
 import { ApiError } from '../../lib/apiClient'
@@ -125,6 +126,7 @@ export function AnaliseVisaoGeralPage() {
             Limpar filtro
           </Button>
         )}
+        <BotaoAtualizarAnalise atualizando={carregando} onClick={() => executarBusca()} />
       </Paper>
 
       {carregando && (

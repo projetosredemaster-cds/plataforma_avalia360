@@ -16,6 +16,7 @@ import { useSearchParams } from 'react-router-dom'
 import FullscreenIcon from '@mui/icons-material/Fullscreen'
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import { BotaoAtualizarAnalise } from '../../components/analise/BotaoAtualizarAnalise/BotaoAtualizarAnalise'
 import { ListaFrequenciaPalavras } from '../../components/analise/ListaFrequenciaPalavras/ListaFrequenciaPalavras'
 import { MetricaCard } from '../../components/analise/MetricaCard/MetricaCard'
 import { NuvemBolhas } from '../../components/analise/NuvemBolhas/NuvemBolhas'
@@ -159,6 +160,7 @@ export function AnaliseNuvemPalavrasPage() {
             Limpar filtro
           </Button>
         )}
+        <BotaoAtualizarAnalise atualizando={carregando} onClick={() => executarBusca()} />
       </Paper>
 
       {carregando && (
