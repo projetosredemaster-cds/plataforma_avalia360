@@ -40,6 +40,33 @@ function coletarChaves(valor: unknown, chaves: Set<string>): void {
 }
 
 /**
+ * Guard rail reutilizável para os testes de `motivoVazio`: serializa o
+ * payload inteiro e confirma ausência de qualquer campo/padrão de identidade
+ * ou contagem bruta de respondentes — não basta checar `motivoVazio`
+ * isoladamente, o enum precisa ser a ÚNICA pista sobre o motivo do vazio.
+ */
+function assertPayloadSemVazamentoDeIdentidade(resultado: unknown): void {
+  const chaves = new Set<string>()
+  coletarChaves(resultado, chaves)
+  for (const proibido of [
+    'avaliadorId',
+    'avaliador_id',
+    'avaliadoId',
+    'avaliadoNome',
+    'avaliadorNome',
+    'tipoRelacionamento',
+    'texto',
+    'totalRespondentes',
+    'respondentes',
+    'quantidadeRespondentes',
+    'minimoRespostasPares',
+    'minimo',
+  ]) {
+    expect(chaves.has(proibido)).toBe(false)
+  }
+}
+
+/**
  * Monta, num único ciclo `avaliacao_360` já dentro do período informado, um
  * grupo `pares`/`subordinado` com `quantidade` respondentes distintos, cada
  * um com uma resposta `texto_aberto` registrada dentro do período — mesmo
@@ -158,6 +185,7 @@ describe('analise-nuvem-palavras.service — buscarNuvemPalavras', () => {
         cicloId: null,
         palavras: [],
         metricas: { totalEnvios: 0, totalRespostas: 0, tempoMedioResposta: { horas: 0, amostras: 0 } },
+        motivoVazio: null,
       }
       await expect(
         analiseNuvemPalavrasService.buscarNuvemPalavras(admin, { de: '2026-01-01', ate: '2026-01-31' }),
@@ -412,8 +440,12 @@ describe('analise-nuvem-palavras.service — buscarNuvemPalavras', () => {
         expect(chaves.has(proibido)).toBe(false)
       }
 
-      // Shape de topo do payload — só os 4 campos documentados no contrato.
-      expect(Object.keys(resultado).sort()).toEqual(['cicloId', 'metricas', 'palavras', 'periodo'].sort())
+      // Shape de topo do payload — 5 campos documentados no contrato (motivoVazio incluso).
+      expect(Object.keys(resultado).sort()).toEqual(
+        ['cicloId', 'metricas', 'motivoVazio', 'palavras', 'periodo'].sort(),
+      )
+      // motivoVazio nunca pode ser um objeto/número — só string do enum ou null.
+      expect(resultado.motivoVazio === null || typeof resultado.motivoVazio === 'string').toBe(true)
     })
   })
 
@@ -582,6 +614,164 @@ describe('analise-nuvem-palavras.service — buscarNuvemPalavras', () => {
     })
   })
 
+  describe('motivoVazio — bloqueado_minimo_respondentes vs sem_dado vs null', () => {
+    it('avaliação 360, cicloId filtrado com grupo pares/subordinado existente mas abaixo do mínimo → bloqueado_minimo_respondentes', async () => {
+      const periodoConsulta = { de: '2026-01-01', ate: '2026-01-31' }
+      const ciclo = criarCicloAvaliacaoFixture({
+        dataInicio: '2026-01-01',
+        dataFim: '2026-01-31',
+        minimoRespostasPares: 3,
+      })
+      repos.ciclosRepo.semear([ciclo])
+      repos.pesquisasRepo.semear([criarPesquisaFixture({ tipo: 'avaliacao_360', cicloId: ciclo.id })])
+
+      semearGrupoParesSubordinado(repos, {
+        cicloId: ciclo.id,
+        tipoRelacionamento: 'pares',
+        quantidade: 2, // abaixo do mínimo de 3
+        respondidoEm: new Date('2026-01-10T00:00:00Z'),
+        texto: () => 'marcadorbloqueado360 nunca deveria aparecer',
+      })
+
+      const resultado = await analiseNuvemPalavrasService.buscarNuvemPalavras(admin, {
+        ...periodoConsulta,
+        cicloId: ciclo.id,
+      })
+
+      expect(resultado.motivoVazio).toBe('bloqueado_minimo_respondentes')
+      expect(resultado.palavras).toEqual([])
+      expect(JSON.stringify(resultado)).not.toContain('marcadorbloqueado360')
+      assertPayloadSemVazamentoDeIdentidade(resultado)
+    })
+
+    it('avaliação 360, cicloId filtrado sem nenhum grupo pares/subordinado nem texto elegível de autoavaliacao/gestor/externo → sem_dado', async () => {
+      const periodoConsulta = { de: '2026-01-01', ate: '2026-01-31' }
+      const ciclo = criarCicloAvaliacaoFixture({ dataInicio: '2026-01-01', dataFim: '2026-01-31' })
+      repos.ciclosRepo.semear([ciclo])
+      repos.pesquisasRepo.semear([criarPesquisaFixture({ tipo: 'avaliacao_360', cicloId: ciclo.id })])
+      // nenhum relacionamento/envio/resposta seedado — ausência de dado, não bloqueio.
+
+      const resultado = await analiseNuvemPalavrasService.buscarNuvemPalavras(admin, {
+        ...periodoConsulta,
+        cicloId: ciclo.id,
+      })
+
+      expect(resultado.motivoVazio).toBe('sem_dado')
+      expect(resultado.palavras).toEqual([])
+      assertPayloadSemVazamentoDeIdentidade(resultado)
+    })
+
+    it('clima_geral, cicloId filtrado com respondentes abaixo do mínimo → bloqueado_minimo_respondentes', async () => {
+      const periodoConsulta = { de: '2026-02-01', ate: '2026-02-28' }
+      const ciclo = criarCicloAvaliacaoFixture({
+        dataInicio: '2026-02-01',
+        dataFim: '2026-02-28',
+        minimoRespostasPares: 3,
+      })
+      repos.ciclosRepo.semear([ciclo])
+      repos.pesquisasRepo.semear([criarPesquisaFixture({ tipo: 'clima_geral', cicloId: ciclo.id })])
+
+      semearClima(repos, {
+        cicloId: ciclo.id,
+        quantidade: 2, // abaixo do mínimo de 3
+        respondidoEm: new Date('2026-02-10T00:00:00Z'),
+        texto: () => 'marcadorbloqueadoclima nunca deveria aparecer',
+      })
+
+      const resultado = await analiseNuvemPalavrasService.buscarNuvemPalavras(admin, {
+        ...periodoConsulta,
+        cicloId: ciclo.id,
+      })
+
+      expect(resultado.motivoVazio).toBe('bloqueado_minimo_respondentes')
+      expect(resultado.palavras).toEqual([])
+      expect(JSON.stringify(resultado)).not.toContain('marcadorbloqueadoclima')
+      assertPayloadSemVazamentoDeIdentidade(resultado)
+    })
+
+    it('clima_geral, cicloId filtrado sem nenhuma resposta → sem_dado', async () => {
+      const periodoConsulta = { de: '2026-02-01', ate: '2026-02-28' }
+      const ciclo = criarCicloAvaliacaoFixture({ dataInicio: '2026-02-01', dataFim: '2026-02-28' })
+      repos.ciclosRepo.semear([ciclo])
+      repos.pesquisasRepo.semear([criarPesquisaFixture({ tipo: 'clima_geral', cicloId: ciclo.id })])
+      // nenhuma resposta_clima seedada
+
+      const resultado = await analiseNuvemPalavrasService.buscarNuvemPalavras(admin, {
+        ...periodoConsulta,
+        cicloId: ciclo.id,
+      })
+
+      expect(resultado.motivoVazio).toBe('sem_dado')
+      expect(resultado.palavras).toEqual([])
+      assertPayloadSemVazamentoDeIdentidade(resultado)
+    })
+
+    it('cicloId filtrado com um grupo liberado (com texto) e outro bloqueado no mesmo ciclo → motivoVazio null, grupo bloqueado nunca contribui', async () => {
+      const periodoConsulta = { de: '2026-01-01', ate: '2026-01-31' }
+      const ciclo = criarCicloAvaliacaoFixture({
+        dataInicio: '2026-01-01',
+        dataFim: '2026-01-31',
+        minimoRespostasPares: 3,
+      })
+      repos.ciclosRepo.semear([ciclo])
+      repos.pesquisasRepo.semear([criarPesquisaFixture({ tipo: 'avaliacao_360', cicloId: ciclo.id })])
+
+      // grupo liberado — avaliado A, pares, 3 respondentes (no mínimo).
+      semearGrupoParesSubordinado(repos, {
+        cicloId: ciclo.id,
+        tipoRelacionamento: 'pares',
+        quantidade: 3,
+        respondidoEm: new Date('2026-01-10T00:00:00Z'),
+        texto: () => 'palavraliberadamista aparece normalmente',
+      })
+      // grupo bloqueado — avaliado B diferente, subordinado, 1 respondente (abaixo do mínimo).
+      semearGrupoParesSubordinado(repos, {
+        cicloId: ciclo.id,
+        tipoRelacionamento: 'subordinado',
+        quantidade: 1,
+        respondidoEm: new Date('2026-01-12T00:00:00Z'),
+        texto: () => 'marcadorbloqueadomisto nunca deveria aparecer',
+      })
+
+      const resultado = await analiseNuvemPalavrasService.buscarNuvemPalavras(admin, {
+        ...periodoConsulta,
+        cicloId: ciclo.id,
+      })
+
+      expect(resultado.motivoVazio).toBeNull()
+      expect(resultado.palavras.find((p) => p.palavra === 'palavraliberadamista')).toBeDefined()
+      expect(resultado.palavras.find((p) => p.palavra === 'marcadorbloqueadomisto')).toBeUndefined()
+      expect(JSON.stringify(resultado)).not.toContain('marcadorbloqueadomisto')
+      assertPayloadSemVazamentoDeIdentidade(resultado)
+    })
+
+    it('filtro só por período (sem cicloId) → motivoVazio sempre null, mesmo com palavras vazio por bloqueio de um grupo', async () => {
+      const periodoConsulta = { de: '2026-01-01', ate: '2026-01-31' }
+      const ciclo = criarCicloAvaliacaoFixture({
+        dataInicio: '2026-01-01',
+        dataFim: '2026-01-31',
+        minimoRespostasPares: 3,
+      })
+      repos.ciclosRepo.semear([ciclo])
+      repos.pesquisasRepo.semear([criarPesquisaFixture({ tipo: 'avaliacao_360', cicloId: ciclo.id })])
+
+      semearGrupoParesSubordinado(repos, {
+        cicloId: ciclo.id,
+        tipoRelacionamento: 'pares',
+        quantidade: 2, // abaixo do mínimo — geraria bloqueado se cicloId fosse filtrado
+        respondidoEm: new Date('2026-01-10T00:00:00Z'),
+        texto: () => 'marcadorsemcicloid nunca deveria aparecer',
+      })
+
+      const resultado = await analiseNuvemPalavrasService.buscarNuvemPalavras(admin, periodoConsulta) // sem cicloId
+
+      expect(resultado.cicloId).toBeNull()
+      expect(resultado.palavras).toEqual([])
+      expect(resultado.motivoVazio).toBeNull()
+      assertPayloadSemVazamentoDeIdentidade(resultado)
+    })
+  })
+
   describe('métricas complementares — reaproveitadas, sem quebra por avaliador/avaliado', () => {
     it('metricas.totalRespostas/totalEnvios refletem o universo do período, sem nenhuma quebra por grupo', async () => {
       const periodoConsulta = { de: '2026-01-01', ate: '2026-01-31' }
@@ -654,6 +844,7 @@ describe('GET /api/analise/nuvem-palavras — controle de acesso por papel (HTTP
         cicloId: null,
         palavras: [],
         metricas: { totalEnvios: 0, totalRespostas: 0, tempoMedioResposta: { horas: 0, amostras: 0 } },
+        motivoVazio: null,
       })
     },
   )

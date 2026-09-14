@@ -184,4 +184,5 @@ export interface NuvemPalavrasAnalise {
   cicloId: string | null
   palavras: PalavraFrequencia[]
   metricas: MetricasComplementaresNuvem
+  motivoVazio: 'bloqueado_minimo_respondentes' | 'sem_dado' | null
 }

@@ -106,6 +106,7 @@ export interface NuvemPalavrasAnalise {
   cicloId: string | null
   palavras: PalavraFrequencia[]
   metricas: MetricasComplementares
+  motivoVazio: 'bloqueado_minimo_respondentes' | 'sem_dado' | null
 }
 
 export interface BuscarNuvemPalavrasDto {
@@ -202,6 +203,10 @@ export async function buscarNuvemPalavras(
       cicloId,
       palavras: [],
       metricas: { totalEnvios: 0, totalRespostas: 0, tempoMedioResposta: { horas: 0, amostras: 0 } },
+      // Ciclo filtrado nem sequer está na vigência do período — ausência de
+      // dado, não há gate a considerar. Sem cicloId no filtro, permanece null
+      // (nunca inferir motivo quando a consulta cobre múltiplos ciclos).
+      motivoVazio: cicloId !== null ? 'sem_dado' : null,
     }
   }
 
@@ -234,5 +239,34 @@ export async function buscarNuvemPalavras(
   const todosOsTextos = [...textosIdentificados, ...textosParesSubordinado, ...textosClima]
   const palavras = contarFrequencia(todosOsTextos)
 
-  return { periodo, cicloId, palavras, metricas }
+  // Motivo categórico do vazio — só quando o filtro é de UM ciclo específico
+  // e a lista final ficou vazia. Nunca nenhuma contagem numérica sai daqui,
+  // só o enum (reversão pontual e justificada da decisão original de "Nuvem
+  // de Palavras", ver CLAUDE.md/spec.md seção 2 — consistência com o estado
+  // equivalente já exposto por "Avaliações"). "Ausência de dado" (ninguém
+  // respondeu nada, nenhum grupo existe) nunca vira "bloqueado" — só quando
+  // existe de fato um grupo abaixo do mínimo configurado.
+  let motivoVazio: NuvemPalavrasAnalise['motivoVazio'] = null
+  if (cicloId !== null && palavras.length === 0) {
+    if (idsAval360.includes(cicloId)) {
+      const linhasDoCiclo = gateParesSubordinado.filter((g) => g.cicloId === cicloId)
+      const minimo = minimosPorCiclo.get(cicloId) ?? 3
+      // `g.totalRespondentes > 0` é defensivo: `calcularGateParesSubordinado`
+      // (INNER JOIN com Resposta) nunca retorna linha com 0 hoje, mas mantém
+      // a mesma guarda explícita do branch de clima abaixo por simetria,
+      // caso essa invariante mude no futuro em outro consumidor.
+      const temGrupoBloqueado = linhasDoCiclo.some((g) => g.totalRespondentes > 0 && g.totalRespondentes < minimo)
+      motivoVazio = temGrupoBloqueado ? 'bloqueado_minimo_respondentes' : 'sem_dado'
+    } else if (idsClima.includes(cicloId)) {
+      const linhaClima = gateClima.find((g) => g.cicloId === cicloId)
+      const minimo = minimosPorCiclo.get(cicloId) ?? 3
+      const bloqueado = !!linhaClima && linhaClima.totalRespondentes > 0 && linhaClima.totalRespondentes < minimo
+      motivoVazio = bloqueado ? 'bloqueado_minimo_respondentes' : 'sem_dado'
+    } else {
+      // Ciclo sem pesquisa vinculada (não entrou em nenhum dos dois grupos).
+      motivoVazio = 'sem_dado'
+    }
+  }
+
+  return { periodo, cicloId, palavras, metricas, motivoVazio }
 }

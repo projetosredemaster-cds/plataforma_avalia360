@@ -242,7 +242,11 @@ export function AnaliseNuvemPalavrasPage() {
           <div className="flex flex-col gap-3">
             <Typography variant={isFullscreen ? 'h5' : 'subtitle1'}>Palavras mais frequentes</Typography>
             {dados.palavras.length === 0 ? (
-              <Alert severity="info">Nenhuma palavra encontrada para o período/filtro selecionado.</Alert>
+              <Alert severity="info">
+                {dados.motivoVazio === 'bloqueado_minimo_respondentes'
+                  ? 'Este ciclo ainda não atingiu o número mínimo de respondentes necessário para exibir dados de forma anônima.'
+                  : 'Nenhuma palavra encontrada para o período/filtro selecionado.'}
+              </Alert>
             ) : visualizacao === 'lista' ? (
               <Paper className="p-2">
                 <ListaFrequenciaPalavras palavras={dados.palavras} />
