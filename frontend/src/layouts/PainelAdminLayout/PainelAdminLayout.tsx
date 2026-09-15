@@ -33,6 +33,7 @@ import ForumIcon from '@mui/icons-material/Forum'
 import LeaderboardIcon from '@mui/icons-material/Leaderboard'
 import CloudIcon from '@mui/icons-material/Cloud'
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined'
+import MarkEmailReadOutlinedIcon from '@mui/icons-material/MarkEmailReadOutlined'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
@@ -79,6 +80,7 @@ const GRUPOS: MenuGroup[] = [
             to: '/analise/resultados-pergunta',
             icon: <TableChartOutlinedIcon fontSize="small" />,
           },
+          { label: 'Envios', to: '/analise/envios', icon: <MarkEmailReadOutlinedIcon fontSize="small" /> },
         ],
       },
       {

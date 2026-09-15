@@ -1,6 +1,7 @@
 import { apiFetch } from '../lib/apiClient'
 import type {
   AvaliacoesAnalise,
+  EnviosAnalise,
   NuvemPalavrasAnalise,
   RankingAnalise,
   ResultadosPerguntaAnalise,
@@ -108,4 +109,22 @@ export function buscarResultadosPerguntaAnalise(
   const query = new URLSearchParams({ de: params.de, ate: params.ate })
   if (params.cicloId) query.set('cicloId', params.cicloId)
   return apiFetch<ResultadosPerguntaAnalise>(`/api/analise/resultados-pergunta?${query.toString()}`)
+}
+
+export interface BuscarEnviosAnaliseParams {
+  de: string // 'YYYY-MM-DD'
+  ate: string // 'YYYY-MM-DD'
+  cicloId?: string
+}
+
+/**
+ * `GET /api/analise/envios` — 1 linha por ciclo, contagens agregadas
+ * (total/pendente/respondido) por ciclo inteiro. Sem gate de anonimização
+ * (ver comentário em `types/analise.ts`) — nunca projeta avaliador/avaliado
+ * individual. `de`/`ate` sempre obrigatórios; `cicloId` opcional.
+ */
+export function buscarEnviosAnalise(params: BuscarEnviosAnaliseParams): Promise<EnviosAnalise> {
+  const query = new URLSearchParams({ de: params.de, ate: params.ate })
+  if (params.cicloId) query.set('cicloId', params.cicloId)
+  return apiFetch<EnviosAnalise>(`/api/analise/envios?${query.toString()}`)
 }

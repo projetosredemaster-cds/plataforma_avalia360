@@ -7,6 +7,7 @@ import {
   buscarRankingAnalise,
   buscarNuvemPalavrasAnalise,
   buscarResultadosPerguntaAnalise,
+  buscarEnviosAnalise,
 } from './analise.controller'
 
 const router = Router()
@@ -18,5 +19,6 @@ router.get('/avaliacoes', asyncHandler(buscarAvaliacoesAnalise))
 router.get('/ranking', asyncHandler(buscarRankingAnalise))
 router.get('/nuvem-palavras', asyncHandler(buscarNuvemPalavrasAnalise))
 router.get('/resultados-pergunta', asyncHandler(buscarResultadosPerguntaAnalise))
+router.get('/envios', asyncHandler(buscarEnviosAnalise))
 
 export { router as analiseRouter }

@@ -19,6 +19,7 @@ import { AnaliseAvaliacoesPage } from './pages/AnaliseAvaliacoesPage/AnaliseAval
 import { AnaliseRankingPage } from './pages/AnaliseRankingPage/AnaliseRankingPage'
 import { AnaliseNuvemPalavrasPage } from './pages/AnaliseNuvemPalavrasPage/AnaliseNuvemPalavrasPage'
 import { AnaliseResultadosPerguntaPage } from './pages/AnaliseResultadosPerguntaPage/AnaliseResultadosPerguntaPage'
+import { AnaliseEnviosPage } from './pages/AnaliseEnviosPage/AnaliseEnviosPage'
 
 function App() {
   return (
@@ -50,6 +51,7 @@ function App() {
           <Route path="/analise/ranking" element={<AnaliseRankingPage />} />
           <Route path="/analise/nuvem-palavras" element={<AnaliseNuvemPalavrasPage />} />
           <Route path="/analise/resultados-pergunta" element={<AnaliseResultadosPerguntaPage />} />
+          <Route path="/analise/envios" element={<AnaliseEnviosPage />} />
         </Route>
       </Route>
 

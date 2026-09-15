@@ -2,6 +2,9 @@
 // relacionamento. Nunca combinar com `types/ciclo.ts` (`Relacionamento`) ou
 // qualquer dado identificado.
 
+import type { StatusCiclo } from './ciclo'
+import type { TipoPesquisa } from './pesquisa'
+
 export interface DistribuicaoTipoMetrica {
   totalCiclos: number
   totalRespostas: number
@@ -302,4 +305,32 @@ export interface ResultadosPerguntaAnalise {
   cicloId: string | null
   avaliacao360: ResultadoPergunta360[]
   climaGeral: ResultadoPerguntaClima[]
+}
+
+// ---- "Envios" (GET /api/analise/envios) ----
+// Payload 100% agregado por CICLO INTEIRO (`COUNT`/`GROUP BY ciclo_id`) —
+// nenhum campo de identidade (`avaliadorId`/`avaliadoId`/`colaboradorId`/
+// `tipoRelacionamento`) em nenhum nível. Diferente de `AvaliacoesAnalise`/
+// `ResultadosPerguntaAnalise`, não há gate de `minimo_respostas_pares` aqui:
+// a menor unidade exposta é o ciclo inteiro, nunca um avaliado/respondente
+// individual, então o cenário que aquele gate protege não se aplica (mesmo
+// raciocínio já usado por `VisaoGeralAnalise`, que também não tem gate).
+
+export interface LinhaEnvioAnalise {
+  cicloId: string
+  nome: string
+  tipoPesquisa: TipoPesquisa | null // null = sem pesquisa vinculada
+  status: StatusCiclo
+  dataInicio: string
+  dataFim: string
+  totalEnvios: number
+  totalPendente: number
+  totalRespondido: number
+  percentualRespondido: number
+}
+
+export interface EnviosAnalise {
+  periodo: { de: string; ate: string }
+  cicloId: string | null
+  ciclos: LinhaEnvioAnalise[]
 }

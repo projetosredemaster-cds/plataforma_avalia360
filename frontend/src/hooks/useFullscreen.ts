@@ -8,15 +8,6 @@ interface UseFullscreenResult<T extends HTMLElement> {
   sair: () => Promise<void>
 }
 
-/**
- * Hook genérico de estado semântico de Fullscreen API — só entra/sai/
- * sincroniza `isFullscreen` com o elemento apontado por `containerRef`.
- * Não contém nenhuma lógica de dimensões/resize (isso é responsabilidade de
- * quem consome o hook, ex. `NuvemBolhas` com seu próprio `ResizeObserver`) e
- * não é específico de nenhuma feature — reaproveitável por qualquer página
- * futura que precise do mesmo padrão de "modo TV"/tela cheia sobre um
- * elemento específico (nunca `document.documentElement`).
- */
 export function useFullscreen<T extends HTMLElement>(): UseFullscreenResult<T> {
   const containerRef = useRef<T | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)

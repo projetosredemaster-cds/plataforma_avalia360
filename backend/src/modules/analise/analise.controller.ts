@@ -4,6 +4,7 @@ import * as analiseAvaliacoesService from './analise-avaliacoes.service'
 import * as analiseRankingService from './analise-ranking.service'
 import * as analiseNuvemPalavrasService from './analise-nuvem-palavras.service'
 import * as analiseResultadosPerguntaService from './analise-resultados-pergunta.service'
+import * as analiseEnviosService from './analise-envios.service'
 
 export async function buscarVisaoGeralAnalise(req: Request, res: Response): Promise<void> {
   const resposta = await analiseService.buscarVisaoGeral(req.colaboradorAutenticado!, {
@@ -46,6 +47,15 @@ export async function buscarNuvemPalavrasAnalise(req: Request, res: Response): P
 
 export async function buscarResultadosPerguntaAnalise(req: Request, res: Response): Promise<void> {
   const resposta = await analiseResultadosPerguntaService.buscarResultadosPergunta(req.colaboradorAutenticado!, {
+    de: req.query.de,
+    ate: req.query.ate,
+    cicloId: req.query.cicloId,
+  })
+  res.status(200).json(resposta)
+}
+
+export async function buscarEnviosAnalise(req: Request, res: Response): Promise<void> {
+  const resposta = await analiseEnviosService.buscarEnviosAnalise(req.colaboradorAutenticado!, {
     de: req.query.de,
     ate: req.query.ate,
     cicloId: req.query.cicloId,

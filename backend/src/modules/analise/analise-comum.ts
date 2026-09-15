@@ -473,3 +473,105 @@ export async function calcularMetricasComplementares(
     tempoMedioResposta: { horas: arredondar1(horasGeral), amostras: amostrasGeral },
   }
 }
+
+export interface ProgressoCicloLote {
+  total: number
+  concluidos: number
+  percentual: number
+}
+
+/**
+ * Mesma fórmula de `calcularPercentual` em `ciclos-avaliacao.service.ts` —
+ * duplicada localmente porque aquela função é privada do módulo de ciclos
+ * (não exportada); pequena duplicação deliberada, mesmo padrão já usado por
+ * `validarDataQuery` acima (task-backend.md de "Envios", passo 1.1).
+ */
+function calcularPercentualLote(total: number, concluidos: number): number {
+  return total === 0 ? 0 : Math.round((concluidos / total) * 100)
+}
+
+/**
+ * Progresso em lote (total/concluídos/percentual) por ciclo, para
+ * `idsAval360`/`idsClima` já classificados por `classificarPorTipo`. Replica
+ * EXATAMENTE o bloco inline de `ciclos-avaliacao.service.ts::listar()`
+ * (decisão de arquitetura 3.2 da spec de "Envios" — duplicação deliberada em
+ * vez de extrair/exportar aquele bloco ou fazer `ciclos-avaliacao/` depender
+ * de `analise/`). Usada hoje só por `analise-envios.service.ts`, mas fica
+ * aqui por ser a peça genuinamente de "análise em lote" — mesmo lugar das
+ * outras funções de contagem em lote deste arquivo.
+ */
+export async function calcularProgressoEmLotePorCiclo(
+  idsAval360: string[],
+  idsClima: string[],
+): Promise<Map<string, ProgressoCicloLote>> {
+  const progressoPorCiclo = new Map<string, ProgressoCicloLote>()
+
+  if (idsAval360.length === 0 && idsClima.length === 0) {
+    return progressoPorCiclo
+  }
+
+  if (idsAval360.length > 0) {
+    const totalPorCiclo = new Map<string, number>()
+    const concluidosPorCiclo = new Map<string, number>()
+
+    // SÓ CONTAGEM, nunca seleciona avaliador_id/avaliado_id/
+    // tipo_relacionamento — guard rail de anonimização, ver skill
+    // backend-anonimizacao-respostas.
+    const linhasTotal = await AppDataSource.getRepository(RelacionamentoAvaliacao)
+      .createQueryBuilder('r')
+      .select('r.ciclo_id', 'cicloId')
+      .addSelect('COUNT(*)', 'total')
+      .where('r.ciclo_id IN (:...ids)', { ids: idsAval360 })
+      .groupBy('r.ciclo_id')
+      .getRawMany<{ cicloId: string; total: string }>()
+
+    for (const linha of linhasTotal) totalPorCiclo.set(linha.cicloId, Number(linha.total))
+
+    // SÓ CONTAGEM, nunca seleciona avaliador_id/avaliado_id/
+    // tipo_relacionamento — guard rail de anonimização, ver skill
+    // backend-anonimizacao-respostas.
+    const linhasConcluidos = await AppDataSource.getRepository(RelacionamentoAvaliacao)
+      .createQueryBuilder('r')
+      .innerJoin(EnvioPesquisa, 'envio', 'envio.relacionamento_id = r.id')
+      .innerJoin(Resposta, 'resposta', 'resposta.envio_id = envio.id')
+      .select('r.ciclo_id', 'cicloId')
+      .addSelect('COUNT(*)', 'total')
+      .where('r.ciclo_id IN (:...ids)', { ids: idsAval360 })
+      .groupBy('r.ciclo_id')
+      .getRawMany<{ cicloId: string; total: string }>()
+
+    for (const linha of linhasConcluidos) concluidosPorCiclo.set(linha.cicloId, Number(linha.total))
+
+    for (const id of idsAval360) {
+      const total = totalPorCiclo.get(id) ?? 0
+      const concluidos = concluidosPorCiclo.get(id) ?? 0
+      progressoPorCiclo.set(id, { total, concluidos, percentual: calcularPercentualLote(total, concluidos) })
+    }
+  }
+
+  if (idsClima.length > 0) {
+    // SÓ CONTAGEM, nunca seleciona avaliador_id/avaliado_id/
+    // tipo_relacionamento — guard rail de anonimização, ver skill
+    // backend-anonimizacao-respostas.
+    const linhas = await AppDataSource.getRepository(CicloParticipante)
+      .createQueryBuilder('cp')
+      .select('cp.ciclo_id', 'cicloId')
+      .addSelect('COUNT(*)', 'total')
+      .addSelect('COUNT(cp.respondeu_em)', 'concluidos')
+      .where('cp.ciclo_id IN (:...ids)', { ids: idsClima })
+      .groupBy('cp.ciclo_id')
+      .getRawMany<{ cicloId: string; total: string; concluidos: string }>()
+
+    for (const linha of linhas) {
+      const total = Number(linha.total)
+      const concluidos = Number(linha.concluidos)
+      progressoPorCiclo.set(linha.cicloId, {
+        total,
+        concluidos,
+        percentual: calcularPercentualLote(total, concluidos),
+      })
+    }
+  }
+
+  return progressoPorCiclo
+}
