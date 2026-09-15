@@ -5,10 +5,12 @@ export function formatarInteiro(valor: number): string {
   return FORMATADOR_INTEIRO.format(valor)
 }
 
-export function formatarTempoMedio(horas: number): string {
-  if (horas <= 0) return '—'
+export function formatarTempoMedio(horas: number, amostras: number): string {
+  if (amostras === 0) return '—'
 
   const totalMinutos = Math.round(horas * 60)
+
+  if (totalMinutos <= 0) return 'Menos de 1 minuto'
 
   if (totalMinutos < 60) {
     return `${totalMinutos}min`

@@ -242,8 +242,22 @@ async function buscarSessaoValidaOuFalhar(sessaoToken: string): Promise<SessaoRe
  * - `autoavaliacao`: nunca contribui, mesmo se marcado no filtro (não faz
  *   sentido indicar a si mesmo) — ignorado ao montar as condições.
  * - `externo`: nenhuma linha desse tipo é gerada hoje pelo motor de ciclos
- *   (reservado para avaliador convidado manualmente) — não contribui
- *   nenhuma condição, sem que isso seja um erro.
+ *   (reservado para avaliador convidado manualmente) — em vez disso, quando
+ *   marcado no filtro, contribui uma condição independente da relação em
+ *   `relacionamentos_avaliacao`, condicionada ao `tipo_relacionamento` do
+ *   relacionamento do envio atual:
+ *   - `gestor`: lista todos os colaboradores ATIVOS da empresa inteira (sem
+ *     restrição de ciclo/equipe/`ciclo_participantes`).
+ *   - `subordinado`: lista todos os gestores ATIVOS da empresa
+ *     (`eh_gestor = true`), também sem restrição de ciclo — mais amplo que
+ *     `todos_gestores` abaixo, que restringe a `ciclo_participantes` deste
+ *     ciclo.
+ *   - `pares`/`autoavaliacao`: continua sem contribuir nenhuma condição,
+ *     sem que isso seja um erro (comportamento antigo preservado só para
+ *     esses dois tipos; fora de escopo até uma decisão futura).
+ *   Em ambos os casos com condição, sempre exclui o respondente
+ *   (`relacionamento.avaliadorId`) e o avaliado (`relacionamento.avaliadoId`)
+ *   deste envio.
  * - `todos_gestores`: IGNORA completamente a relação com o respondente —
  *   lista todos os colaboradores com `eh_gestor = true` E `ativo = true`
  *   que sejam `ciclo_participantes` do MESMO ciclo
@@ -252,8 +266,10 @@ async function buscarSessaoValidaOuFalhar(sessaoToken: string): Promise<SessaoRe
  *   Combinável com os filtros acima (união dos dois conjuntos de
  *   resultados, sem duplicar — mesmo dedupe por id já usado). Sempre
  *   exclui o próprio respondente, mesmo que ele seja gestor.
- * Se, depois de descartar `autoavaliacao`/`externo`, nenhum tipo válido
- * sobrar E `todos_gestores` não estiver marcado, retorna `[]` sem consultar
+ * Se, depois de descartar `autoavaliacao` (e `externo` quando o tipo do
+ * relacionamento do envio não for `gestor`/`subordinado`), nenhum tipo
+ * válido sobrar, `todos_gestores` não estiver marcado, e `externo` também
+ * não se aplicar (tipo `gestor`/`subordinado`), retorna `[]` sem consultar
  * o banco. O resultado é deduplicado por id do colaborador (necessário pela
  * simetria de `pares`, por segurança quando a mesma pessoa aparece via mais
  * de um tipo marcado no filtro, e agora também quando a mesma pessoa é ao
@@ -289,10 +305,18 @@ export async function resolverOpcoesPessoa(
   if (filtro.includes('subordinado')) {
     condicoes.push("(r.tipo_relacionamento = 'subordinado' AND r.avaliado_id = :respondenteId)")
   }
-  // 'autoavaliacao' nunca contribui e 'externo' nunca tem linhas geradas hoje
-  // — nenhum dos dois adiciona uma condição aqui.
+  // 'autoavaliacao' nunca contribui; 'externo' também não contribui aqui
+  // (relacionamentos_avaliacao) — para 'gestor'/'subordinado' ele é resolvido
+  // à parte logo abaixo, consultando `colaboradores` diretamente.
   const incluirTodosGestores = filtro.includes('todos_gestores')
-  if (condicoes.length === 0 && !incluirTodosGestores) return []
+  const incluirExterno = filtro.includes('externo')
+  if (
+    condicoes.length === 0 &&
+    !incluirTodosGestores &&
+    !(incluirExterno && (relacionamento.tipoRelacionamento === 'gestor' || relacionamento.tipoRelacionamento === 'subordinado'))
+  ) {
+    return []
+  }
 
   const porId = new Map<string, OpcaoPessoaFormulario>()
 
@@ -339,6 +363,43 @@ export async function resolverOpcoesPessoa(
       .getRawMany<OpcaoPessoaFormulario>()
 
     for (const linha of linhasGestores) porId.set(linha.id, linha)
+  }
+
+  if (incluirExterno && relacionamento.tipoRelacionamento === 'gestor') {
+    // 'externo' para quem avalia como 'gestor' (avaliador de uma relação
+    // "Gestor avalia liderado"): todos os colaboradores ATIVOS da empresa
+    // inteira, sem restrição de ciclo/equipe/`ciclo_participantes` — decisão
+    // 1 da spec. Consulta só `colaboradores` (dado estrutural, nunca
+    // conteúdo de resposta).
+    const linhasExterno = await AppDataSource.getRepository(Colaborador)
+      .createQueryBuilder('c')
+      .select('c.id', 'id')
+      .addSelect('c.nome_completo', 'nomeCompleto')
+      .where('c.ativo = true')
+      .andWhere('c.id <> :respondenteIdExterno', { respondenteIdExterno: respondenteId })
+      .andWhere('c.id <> :avaliadoIdExterno', { avaliadoIdExterno: relacionamento.avaliadoId })
+      .getRawMany<OpcaoPessoaFormulario>()
+
+    for (const linha of linhasExterno) porId.set(linha.id, linha)
+  }
+
+  if (incluirExterno && relacionamento.tipoRelacionamento === 'subordinado') {
+    // 'externo' para quem avalia como 'subordinado' (avaliador de uma
+    // relação "Liderado avalia gestor"): todos os gestores ATIVOS da
+    // empresa, sem restrição de ciclo — decisão 2 da spec (deliberadamente
+    // mais amplo que `todos_gestores` acima, que restringe a
+    // `ciclo_participantes` deste ciclo). Consulta só `colaboradores`.
+    const linhasExterno = await AppDataSource.getRepository(Colaborador)
+      .createQueryBuilder('c')
+      .select('c.id', 'id')
+      .addSelect('c.nome_completo', 'nomeCompleto')
+      .where('c.ativo = true')
+      .andWhere('c.eh_gestor = true')
+      .andWhere('c.id <> :respondenteIdExterno', { respondenteIdExterno: respondenteId })
+      .andWhere('c.id <> :avaliadoIdExterno', { avaliadoIdExterno: relacionamento.avaliadoId })
+      .getRawMany<OpcaoPessoaFormulario>()
+
+    for (const linha of linhasExterno) porId.set(linha.id, linha)
   }
 
   // Deduplica por id — necessário pela simetria de `pares` (mesmo colega via

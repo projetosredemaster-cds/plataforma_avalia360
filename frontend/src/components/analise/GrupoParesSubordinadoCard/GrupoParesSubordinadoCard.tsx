@@ -18,7 +18,7 @@ export function GrupoParesSubordinadoCard({ grupo }: GrupoParesSubordinadoCardPr
         <Chip size="small" label={rotuloTipoRelacionamento(grupo.tipoRelacionamento)} />
       </div>
       {grupo.liberado ? (
-        <TextoAbertoLista textos={grupo.textos ?? []} />
+        <TextoAbertoLista textos={grupo.textos ?? []} arredondarPainel />
       ) : (
         <EstadoAguardandoMinimo totalRespondentes={grupo.totalRespondentes} minimoNecessario={grupo.minimoNecessario} />
       )}

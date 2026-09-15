@@ -234,7 +234,7 @@ export function AnaliseNuvemPalavrasPage() {
             />
             <MetricaCard
               titulo="Tempo médio de resposta"
-              valor={formatarTempoMedio(dados.metricas.tempoMedioResposta.horas)}
+              valor={formatarTempoMedio(dados.metricas.tempoMedioResposta.horas, dados.metricas.tempoMedioResposta.amostras)}
               descricao={`${formatarInteiro(dados.metricas.tempoMedioResposta.amostras)} respostas com tempo registrado`}
               tooltip="Tempo médio que as pessoas levam para responder à pesquisa assim que recebem o link, no período selecionado."
               tamanho={isFullscreen ? 'grande' : 'padrao'}

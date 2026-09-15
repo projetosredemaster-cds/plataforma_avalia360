@@ -172,11 +172,23 @@ export function AnaliseVisaoGeralPage() {
               />
               <MetricaCard
                 titulo="Tempo médio de resposta"
-                valor={formatarTempoMedio(dados.tempoMedioResposta.geral.horas)}
+                valor={formatarTempoMedio(dados.tempoMedioResposta.geral.horas, dados.tempoMedioResposta.geral.amostras)}
                 descricao={`${formatarInteiro(dados.tempoMedioResposta.geral.amostras)} respostas com tempo registrado`}
                 detalhes={[
-                  { rotulo: 'Avaliação 360', valor: formatarTempoMedio(dados.tempoMedioResposta.avaliacao_360.horas) },
-                  { rotulo: 'Clima e Satisfação', valor: formatarTempoMedio(dados.tempoMedioResposta.clima_geral.horas) },
+                  {
+                    rotulo: 'Avaliação 360',
+                    valor: formatarTempoMedio(
+                      dados.tempoMedioResposta.avaliacao_360.horas,
+                      dados.tempoMedioResposta.avaliacao_360.amostras,
+                    ),
+                  },
+                  {
+                    rotulo: 'Clima e Satisfação',
+                    valor: formatarTempoMedio(
+                      dados.tempoMedioResposta.clima_geral.horas,
+                      dados.tempoMedioResposta.clima_geral.amostras,
+                    ),
+                  },
                 ]}
                 tooltip="Este indicador mostra o tempo médio que as pessoas levam para responder à pesquisa assim que recebem o link. Para facilitar a leitura, o valor se adapta automaticamente: mostra apenas em minutos quando leva menos de uma hora, em horas e minutos para prazos de até um dia, e em dias, horas e minutos quando ultrapassa 24 horas."
               />

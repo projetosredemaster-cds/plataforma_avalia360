@@ -1,8 +1,11 @@
 import { Paper, Typography } from '@mui/material'
 import type { TextoAbertoItem } from '../../../types/analise'
+import { PAINEL_TEXTO_ABERTO_ARREDONDADO, PAINEL_TEXTO_ABERTO_BASE } from '../estilosPainelTextoAberto'
 
 interface TextoAbertoListaProps {
   textos: TextoAbertoItem[]
+  /** Quando `true`, arredonda os cantos do painel (usado pela seção "pares e subordinados"). */
+  arredondarPainel?: boolean
 }
 
 interface GrupoPerguntaTexto {
@@ -24,8 +27,9 @@ function agruparPorPergunta(textos: TextoAbertoItem[]): GrupoPerguntaTexto[] {
   return Array.from(mapa.values())
 }
 
-export function TextoAbertoLista({ textos }: TextoAbertoListaProps) {
+export function TextoAbertoLista({ textos, arredondarPainel = false }: TextoAbertoListaProps) {
   const grupos = agruparPorPergunta(textos)
+  const classesPainel = arredondarPainel ? PAINEL_TEXTO_ABERTO_ARREDONDADO : PAINEL_TEXTO_ABERTO_BASE
   return (
     <div className="flex flex-col gap-4">
       {grupos.map((grupo) => (
@@ -36,7 +40,7 @@ export function TextoAbertoLista({ textos }: TextoAbertoListaProps) {
               {grupo.perguntaEnunciado}
             </Typography>
           </Typography>
-          <div className="flex flex-col gap-2 bg-blue-50 border-blue-200 p-2">
+          <div className={classesPainel}>
             {grupo.textos.map((item, indice) => (
               <Paper key={`${item.perguntaId}-${indice}`} variant="outlined" className="p-6">
                 <Typography variant="body2" sx={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>

@@ -23,6 +23,7 @@ import { SeletorCiclo } from '../../components/analise/SeletorCiclo/SeletorCiclo
 import { ApiError } from '../../lib/apiClient'
 import { buscarAvaliacoesAnalise } from '../../services/analiseService'
 import type { AvaliacoesAnalise } from '../../types/analise'
+import { PAINEL_TEXTO_ABERTO_ARREDONDADO } from '../../components/analise/estilosPainelTextoAberto'
 import { agruparIdentificadasPorPergunta, agruparPorCiclo } from './agrupamento'
 import { hojeYMD, inicioAnoCorrenteYMD } from './formatadores'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
@@ -206,7 +207,7 @@ export function AnaliseAvaliacoesPage() {
                         >
                           {g.perguntaEnunciado}
                         </Typography>
-                        <div className="flex flex-col gap-2">
+                        <div className={PAINEL_TEXTO_ABERTO_ARREDONDADO}>
                           {g.itens.map((item, indice) => (
                             <AvaliacaoIdentificadaCard
                               key={`${item.avaliadoId}-${item.avaliadorId}-${indice}`}
