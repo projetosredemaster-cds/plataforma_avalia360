@@ -78,25 +78,45 @@ Plataforma de Avaliação 360° — uma plataforma single-tenant de avaliação 
   busca. Esta é a tela MAIS ESTRITA do módulo: o payload nunca expõe
   `totalRespondentes`/`minimoNecessario` (diferente de "Avaliações") — só
   `liberado: boolean` + `motivo?: 'aguardando_minimo_respondentes'`;
-  `analise-resultados-pergunta.service.ts`). Lógica compartilhada pelas cinco telas
-  (universo de ciclos por período, classificação avaliação_360/clima_geral, o gate de
+  `analise-resultados-pergunta.service.ts`) e `GET /api/analise/envios` (sexta tela,
+  "Envios" — pipeline completo já concluído: `spec`, `planejamento-backend`/
+  `planejamento-frontend`, `backend-developer`/`frontend-developer`,
+  `backend-codereviewer`/`frontend-codereviewer` sem achados críticos e `test-engineer`,
+  ver `.claude/tasks/analise-envios/`. Único relatório TABULAR do módulo — 1 linha por
+  ciclo com contagens agregadas de pendentes/respondidos, sem drill-down por pessoa (isso
+  já existe em `CicloDetalhePage`) e sem nenhuma ação/botão (copiar link, marcar como
+  enviado, expirar, lembrete continuam exclusivos do detalhe do Ciclo). Filtros de
+  período + `cicloId` opcional, mesmo padrão de "Visão Geral"/"Avaliações"/"Nuvem de
+  Palavras". Reaproveita `buscarUniversoCiclos`/`classificarPorTipo` de `analise-comum.ts`
+  e adiciona `calcularProgressoEmLotePorCiclo` (nova função exportada de
+  `analise-comum.ts`, mesmo guard rail de "SÓ CONTAGEM" já usado pelo bloco de progresso
+  em lote de `ciclos-avaliacao.service.ts::listar()` — decisão deliberada de duplicar em
+  vez de extrair aquele bloco, para não inverter a direção de dependência entre os dois
+  módulos); `analise-envios.service.ts`). Lógica compartilhada pelas seis telas (universo
+  de ciclos por período, classificação avaliação_360/clima_geral, o gate de
   pares/subordinado, e também as contagens/cálculo de tempo médio e
   `calcularMetricasComplementares` reaproveitados por Visão Geral e Nuvem de Palavras) vive
   em `analise-comum.ts`. Espelhado no frontend por `AnaliseVisaoGeralPage`,
-  `AnaliseAvaliacoesPage`, `AnaliseRankingPage`, `AnaliseNuvemPalavrasPage` e
-  `AnaliseResultadosPerguntaPage` — todas sem atalho no card do Ciclo, acessíveis só pelo
-  menu lateral (Análises → Quantitativa para Visão Geral/Ranking/Resultados por Pergunta,
-  Análises → Qualitativa para Avaliações/Nuvem de Palavras).
+  `AnaliseAvaliacoesPage`, `AnaliseRankingPage`, `AnaliseNuvemPalavrasPage`,
+  `AnaliseResultadosPerguntaPage` e `AnaliseEnviosPage` — todas sem atalho no card do
+  Ciclo, acessíveis só pelo menu lateral (Análises → Quantitativa para Visão Geral/
+  Ranking/Resultados por Pergunta/Envios, Análises → Qualitativa para Avaliações/Nuvem de
+  Palavras).
 
 Os agentes/skills do próprio repositório (`.claude/agents/*.md`, `.claude/skills/**/*.md`)
 se referem a estes diretórios como `apps/web` e `apps/api` — essa nomenclatura não existe
 em disco, os diretórios reais são `frontend/` e `backend/`. Leia os arquivos de
 agente/skill com essa substituição em mente.
 
-`docs/schema_avaliacao360_pt_v2.sql` existe no repo — é a fonte de verdade para nomes de
-tabela/coluna dos módulos ainda não implementados. Para os módulos já implementados, as
-migrations existentes em `backend/src/migrations/` (10 arquivos, ver histórico de nomes
-lá) são a fonte de verdade de fato. Nenhuma delas rodou contra um banco real ainda —
+`docs/schema_avaliacao360_pt_v2.sql` foi removido do repositório (commit `9630ec9`) —
+não existe mais em disco, só no histórico do git, e não deve mais ser citado como fonte de
+verdade em novo trabalho. Isso deixou de ser um problema prático porque todos os módulos
+que este arquivo descrevia já foram implementados (ver lista de módulos no início desta
+seção); as migrations existentes em `backend/src/migrations/` (10 arquivos, ver histórico
+de nomes lá) são hoje a ÚNICA fonte de verdade de nomes de tabela/coluna do projeto. Se uma
+funcionalidade futura precisar de uma tabela/coluna ainda inexistente, ela precisa ser
+especificada do zero (via `spec`/`planejamento-backend`) — não há mais um doc de schema
+antecipado para consultar. Nenhuma migration rodou contra um banco real ainda —
 confirme sempre com o usuário antes de decidir entre editar uma migration in-place ou
 gerar uma nova migration de correção em cima (a mais recente,
 `1788650000000-TiposRelacionamentoGeradosPorCiclo.ts`, seguiu o mesmo padrão de nova
@@ -104,16 +124,19 @@ migration de correção em vez de editar
 `1788300000000-CriarCiclosAvaliacaoRelacionamentosEParticipantes.ts` in-place, por já
 ser de uma task fechada anteriormente — trate isso como o padrão a seguir: uma vez que
 uma migration corresponde a uma task já fechada, prefira uma nova migration de correção,
-mesmo que nenhuma tenha rodado ainda). Divergência conhecida e deliberada
-entre as duas: o módulo `perguntas` usa `enunciado` (sem `descricao`) e uma tabela
-relacional `perguntas_competencias` para o vínculo matriz↔competência, enquanto o doc de
-schema descreve `titulo`+`descricao` e vínculo via jsonb — já implementado ponta a ponta
+mesmo que nenhuma tenha rodado ainda). Divergência histórica conhecida e deliberada (o
+doc de schema que a descrevia foi removido, mas a decisão continua valendo): o módulo
+`perguntas` usa `enunciado` (sem `descricao`) e uma tabela relacional
+`perguntas_competencias` para o vínculo matriz↔competência, em vez de `titulo`+`descricao`
+e vínculo via jsonb como o schema antigo descrevia — já implementado ponta a ponta
 (service, DTOs, 15 arquivos do frontend); não alterar isso sem confirmação explícita do
 usuário.
 
-`backend/scripts/` existe para scripts pontuais de diagnóstico/verificação (não é suite
-de teste formal, não roda em CI, não faz parte do build) — atualmente vazio (o script
-que existia aqui, `verificar-resolver-opcoes-pessoa.ts`, foi removido). Um script desse
+`backend/scripts/` é o diretório convencional para scripts pontuais de diagnóstico/
+verificação (não é suite de teste formal, não roda em CI, não faz parte do build) — hoje
+nem existe em disco (o único script que já existiu aqui,
+`verificar-resolver-opcoes-pessoa.ts`, foi removido, e o git não versiona diretório
+vazio); crie-o de novo se precisar de um script pontual. Um script desse
 diretório tipicamente semeia dados prefixados `ZTeste_` via funções de service reais e
 compara o resultado de uma função contra um gabarito calculado à mão, imprimindo (sem
 executar) o SQL de limpeza ao final. Mesma regra de nunca rodar contra um banco real sem
@@ -193,9 +216,10 @@ para aquele avaliado + ciclo + tipo atingir `ciclos_avaliacao.minimo_respostas_p
 identificadas. RH/admin sempre têm a visão identificada completa. Nunca escreva uma
 query/endpoint acessível por `colaborador` que junte `itens_resposta` com
 `relacionamentos_avaliacao.avaliador_id` para linhas `pares`/`subordinado` — replique a
-separação de `respostas_identificadas`/`respostas_pares_agregadas` (nomes de views
-definidas só em `docs/schema_avaliacao360_pt_v2.sql`; nenhuma migration real chegou a
-criá-las — o módulo `analise` implementa essa mesma separação diretamente em TypeORM,
+separação de `respostas_identificadas`/`respostas_pares_agregadas` (nomes de views que
+estavam definidas só no antigo `docs/schema_avaliacao360_pt_v2.sql`, removido do repo —
+nenhuma migration real chegou a criá-las — o módulo `analise` implementa essa mesma
+separação diretamente em TypeORM,
 gate primeiro via `calcularGateParesSubordinado`/`calcularGateClima` em
 `analise-comum.ts`, busca de texto só depois, nunca buscar-depois-filtrar). Abaixo do
 mínimo, retorne um estado explícito (ex.:
@@ -243,10 +267,11 @@ src/modules/<nome>/
   inventar nomes. Para toda tabela/coluna já criada por uma migration em
   `backend/src/migrations/` — o que hoje cobre todos os módulos listados na seção
   "Projeto", incluindo `respostas`/`itens_resposta`/`respostas_clima`/
-  `itens_resposta_clima` (mesmo só com a escrita implementada) — a migration é a
-  referência de fato; `docs/schema_avaliacao360_pt_v2.sql` só vale como referência para
-  tabela/coluna que ainda não tenha nenhuma migration correspondente (ver seção "Projeto"
-  sobre a divergência conhecida no módulo `perguntas`).
+  `itens_resposta_clima` (mesmo só com a escrita implementada) — a migration é a ÚNICA
+  referência de fato hoje; o antigo `docs/schema_avaliacao360_pt_v2.sql` foi removido do
+  repo e não deve mais ser citado (ver seção "Projeto" sobre a divergência histórica
+  conhecida no módulo `perguntas`, e sobre o que fazer se uma tabela/coluna futura ainda
+  não tiver migration).
 - Enums do Postgres (`papel_colaborador`, `tipo_pergunta`, `status_pesquisa`,
   `status_ciclo`, `tipo_relacionamento`, `status_envio` e `tipo_pesquisa` já existem)
   mapeiam para union types TypeScript (`src/common/enums.ts`, ver `PapelColaborador`) com
